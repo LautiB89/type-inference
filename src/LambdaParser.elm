@@ -191,7 +191,7 @@ viewExpr showImplicitParens res =
             fromExpr showImplicitParens expr
 
         Err _ ->
-            "Falló el parsing"
+            "Parsing failed"
 
 
 fromNat : Bool -> NatExpr -> String
