@@ -1,6 +1,9 @@
 module LambdaParser exposing
     ( parse
     , viewExpr
+    , Expr(..)
+    , NatExpr(..)
+    , BoolExpr(..) 
     )
 
 import List exposing (foldl)
@@ -12,7 +15,7 @@ import Parser
         , Parser
         , Step(..)
         , Trailing(..)
-        , int
+        , end
         , keyword
         , lazy
         , oneOf
@@ -22,8 +25,7 @@ import Parser
         , symbol
         , variable
         )
-import Set exposing (fromList)
-import String exposing (fromInt)
+import Set
 
 
 
@@ -64,9 +66,9 @@ boolParser : Parser BoolExpr
 boolParser =
     oneOf
         [ succeed ConstTrue
-            |. keyword "True"
+            |. keyword "true"
         , succeed ConstFalse
-            |. keyword "False"
+            |. keyword "false"
         , succeed IsZero
             |. keyword "isZero"
             |= betweenParens (lazy (\_ -> natParser))
@@ -100,6 +102,9 @@ appParserHelper xs =
         [ succeed (\x -> Loop (x :: xs))
             |= lazy (\_ -> nonAppParser)
             |. spaces
+        -- , succeed (\x -> Loop (x :: xs))
+        --     |= lazy (\_ -> appParser)
+        --     |. spaces
         , succeed ()
             |> Parser.map (\_ -> Done (List.reverse xs))
         ]
@@ -109,10 +114,12 @@ nonAppParser : Parser Expr
 nonAppParser =
     oneOf
         [ varParser
-        , absParser
         , Parser.map Bool boolParser
         , Parser.map Nat natParser
         , ifParser
+        -- absParser being last is important
+        , absParser
+        , betweenParens (lazy (\_ -> lambdaParser))
         ]
 
 
@@ -126,12 +133,13 @@ betweenParens p =
         |. symbol ")"
 
 
+
 varIdParser : Parser String
 varIdParser =
     variable
         { start = Char.isLower
         , inner = \c -> Char.isAlphaNum c || c == '_'
-        , reserved = Set.fromList [ "True", "False", "if", "then", "else", "zero", "succ", "pred", "isZero" ]
+        , reserved = Set.fromList [ "true", "false", "if", "then", "else", "zero", "succ", "pred", "isZero" ]
         }
 
 
@@ -143,15 +151,12 @@ varParser =
 absParser : Parser Expr
 absParser =
     succeed Abs
-        |. symbol "("
         |. symbol "\\"
         |= varIdParser
         |. spaces
         |. symbol "."
         |. spaces
         |= lazy (\_ -> lambdaParser)
-        |. spaces
-        |. symbol ")"
 
 
 ifParser : Parser Expr
@@ -179,8 +184,9 @@ lambdaParser =
         ]
 
 
+parse : String -> Result (List DeadEnd) Expr
 parse =
-    run lambdaParser
+    run (lambdaParser |. end)
 
 
 viewExpr : Result (List DeadEnd) Expr -> String
@@ -210,13 +216,23 @@ fromBool : BoolExpr -> String
 fromBool expr =
     case expr of
         ConstTrue ->
-            "True"
+            "true"
 
         ConstFalse ->
-            "False"
+            "false"
 
         IsZero natExpr1 ->
             "isZero(" ++ fromNat natExpr1 ++ ")"
+
+
+isApp : Expr -> Bool
+isApp expr =
+    case expr of
+        App _ _ ->
+            True
+
+        _ ->
+            False
 
 
 fromExpr : Expr -> String
@@ -225,11 +241,11 @@ fromExpr expr =
         Var id ->
             id
 
-        Abs id expr2 ->
-            "(λ" ++ id ++ " . " ++ fromExpr expr2 ++ ")"
+        Abs id expr1 ->
+            "(λ" ++ id ++ " . " ++ fromExpr expr1 ++ ")"
 
         App expr1 expr2 ->
-            "(" ++ fromExpr expr1 ++ " " ++ fromExpr expr2 ++ ")"
+            fromExpr expr1 ++ " " ++ maybeParens (fromExpr expr2) (isApp expr2)
 
         Bool boolExpr1 ->
             fromBool boolExpr1
@@ -244,3 +260,12 @@ fromExpr expr =
                 ++ fromExpr expr2
                 ++ " else "
                 ++ fromExpr expr3
+
+
+maybeParens : String -> Bool -> String
+maybeParens s b =
+    if b then
+        "(" ++ s ++ ")"
+
+    else
+        s

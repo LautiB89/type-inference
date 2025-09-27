@@ -7,7 +7,6 @@ import Html.Events exposing (onInput)
 import LambdaParser exposing (parse, viewExpr)
 
 
-
 -- MAIN
 
 
@@ -53,4 +52,5 @@ view model =
     div []
         [ input [ placeholder "Text to parse", value model.content, onInput Change ] []
         , div [] [ text (viewExpr (parse model.content)) ]
+        , div [] [ text (Debug.toString (parse model.content)) ]
         ]
