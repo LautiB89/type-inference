@@ -1,10 +1,11 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, div, input, text)
+import Html exposing (Html, div, input, text, button)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
 import LambdaParser exposing (parse, viewExpr)
+import Html.Events exposing (onClick)
 
 
 -- MAIN
@@ -20,12 +21,12 @@ main =
 
 
 type alias Model =
-    { content : String }
+    { content : String, showImplicitParens : Bool }
 
 
 init : Model
 init =
-    { content = "" }
+    { content = "", showImplicitParens = False }
 
 
 
@@ -33,7 +34,7 @@ init =
 
 
 type Msg
-    = Change String
+    = Change String | ToggleImplicitParens
 
 
 update : Msg -> Model -> Model
@@ -41,6 +42,8 @@ update msg model =
     case msg of
         Change newContent ->
             { model | content = newContent }
+        ToggleImplicitParens ->
+            { model | showImplicitParens = not model.showImplicitParens }
 
 
 
@@ -51,6 +54,6 @@ view : Model -> Html Msg
 view model =
     div []
         [ input [ placeholder "Text to parse", value model.content, onInput Change ] []
-        , div [] [ text (viewExpr (parse model.content)) ]
-        , div [] [ text (Debug.toString (parse model.content)) ]
+        , button [ onClick ToggleImplicitParens ] [ text "toggle implicit parens" ]
+        , div [] [ text (viewExpr model.showImplicitParens (parse model.content)) ]
         ]

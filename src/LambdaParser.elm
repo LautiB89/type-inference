@@ -1,9 +1,9 @@
 module LambdaParser exposing
-    ( parse
-    , viewExpr
+    ( BoolExpr(..)
     , Expr(..)
     , NatExpr(..)
-    , BoolExpr(..) 
+    , parse
+    , viewExpr
     )
 
 import List exposing (foldl)
@@ -34,8 +34,8 @@ import Set
 
 type NatExpr
     = ConstZero
-    | Succ NatExpr
-    | Pred NatExpr
+    | Succ Expr
+    | Pred Expr
 
 
 natParser : Parser NatExpr
@@ -45,10 +45,10 @@ natParser =
             |. symbol "zero"
         , succeed Succ
             |. keyword "succ"
-            |= betweenParens (lazy (\_ -> natParser))
+            |= betweenParens (lazy (\_ -> lambdaParser))
         , succeed Pred
             |. keyword "pred"
-            |= betweenParens (lazy (\_ -> natParser))
+            |= betweenParens (lazy (\_ -> lambdaParser))
         ]
 
 
@@ -59,7 +59,7 @@ natParser =
 type BoolExpr
     = ConstTrue
     | ConstFalse
-    | IsZero NatExpr
+    | IsZero Expr
 
 
 boolParser : Parser BoolExpr
@@ -71,7 +71,7 @@ boolParser =
             |. keyword "false"
         , succeed IsZero
             |. keyword "isZero"
-            |= betweenParens (lazy (\_ -> natParser))
+            |= betweenParens (lazy (\_ -> lambdaParser))
         ]
 
 
@@ -129,7 +129,6 @@ betweenParens p =
         |. symbol ")"
 
 
-
 varIdParser : Parser String
 varIdParser =
     variable
@@ -185,31 +184,31 @@ parse =
     run (lambdaParser |. end)
 
 
-viewExpr : Result (List DeadEnd) Expr -> String
-viewExpr res =
+viewExpr : Bool -> Result (List DeadEnd) Expr -> String
+viewExpr showImplicitParens res =
     case res of
         Ok expr ->
-            fromExpr expr
+            fromExpr showImplicitParens expr
 
         Err _ ->
             "Falló el parsing"
 
 
-fromNat : NatExpr -> String
-fromNat expr =
+fromNat : Bool -> NatExpr -> String
+fromNat showImplicitParens expr =
     case expr of
         ConstZero ->
             "0"
 
         Succ expr2 ->
-            "succ(" ++ fromNat expr2 ++ ")"
+            "succ(" ++ fromExpr showImplicitParens expr2 ++ ")"
 
         Pred expr2 ->
-            "pred(" ++ fromNat expr2 ++ ")"
+            "pred(" ++ fromExpr showImplicitParens expr2 ++ ")"
 
 
-fromBool : BoolExpr -> String
-fromBool expr =
+fromBool : Bool -> BoolExpr -> String
+fromBool showImplicitParens expr =
     case expr of
         ConstTrue ->
             "true"
@@ -217,8 +216,8 @@ fromBool expr =
         ConstFalse ->
             "false"
 
-        IsZero natExpr1 ->
-            "isZero(" ++ fromNat natExpr1 ++ ")"
+        IsZero expr1 ->
+            "isZero(" ++ fromExpr showImplicitParens expr1 ++ ")"
 
 
 isApp : Expr -> Bool
@@ -231,31 +230,35 @@ isApp expr =
             False
 
 
-fromExpr : Expr -> String
-fromExpr expr =
+fromExpr : Bool -> Expr -> String
+fromExpr showImplicitParens expr =
+    let
+        rec =
+            fromExpr showImplicitParens
+    in
     case expr of
         Var id ->
             id
 
         Abs id expr1 ->
-            "(λ" ++ id ++ " . " ++ fromExpr expr1 ++ ")"
+            "(λ" ++ id ++ " . " ++ rec expr1 ++ ")"
 
         App expr1 expr2 ->
-            fromExpr expr1 ++ " " ++ maybeParens (fromExpr expr2) (isApp expr2)
+            maybeParens (rec expr1) (isApp expr1 && showImplicitParens) ++ " " ++ maybeParens (rec expr2) (isApp expr2)
 
         Bool boolExpr1 ->
-            fromBool boolExpr1
+            fromBool showImplicitParens boolExpr1
 
         Nat natExpr1 ->
-            fromNat natExpr1
+            fromNat showImplicitParens natExpr1
 
         If expr1 expr2 expr3 ->
             "if "
-                ++ fromExpr expr1
+                ++ rec expr1
                 ++ " then "
-                ++ fromExpr expr2
+                ++ rec expr2
                 ++ " else "
-                ++ fromExpr expr3
+                ++ rec expr3
 
 
 maybeParens : String -> Bool -> String

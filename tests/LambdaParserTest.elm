@@ -39,10 +39,16 @@ natParseTest =
                 Expect.equal (parse "zero") (Ok (Nat ConstZero))
         , test "succ" <|
             \_ ->
-                Expect.equal (parse "succ(zero)") (Ok (Nat (Succ ConstZero)))
+                Expect.equal (parse "succ(zero)") (Ok (Nat (Succ (Nat ConstZero))))
         , test "pred" <|
             \_ ->
-                Expect.equal (parse "pred(zero)") (Ok (Nat (Pred ConstZero)))
+                Expect.equal (parse "pred(zero)") (Ok (Nat (Pred (Nat ConstZero))))
+        , test "succ of some applications" <|
+            \_ ->
+                Expect.equal (parse "succ(x y z)") (Ok (Nat (Succ (App (App (Var "x") (Var "y")) (Var "z")))))
+        , test "pred of succ of var" <|
+            \_ ->
+                Expect.equal (parse "pred(succ(y_1))") (Ok (Nat (Pred (Nat (Succ (Var "y_1"))))))
         ]
 
 
@@ -57,7 +63,10 @@ boolParseTest =
                 Expect.equal (parse "false") (Ok (Bool ConstFalse))
         , test "isZero" <|
             \_ ->
-                Expect.equal (parse "isZero(zero)") (Ok (Bool (IsZero ConstZero)))
+                Expect.equal (parse "isZero(zero)") (Ok (Bool (IsZero (Nat ConstZero))))
+        , test "isZero of a wrong application" <|
+            \_ ->
+                Expect.equal (parse "isZero(false x1)") (Ok (Bool (IsZero (App (Bool ConstFalse) (Var "x1")))))
         ]
 
 
