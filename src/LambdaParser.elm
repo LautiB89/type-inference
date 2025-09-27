@@ -20,7 +20,9 @@ import Parser
         , spaces
         , succeed
         , symbol
+        , variable
         )
+import Set exposing (fromList)
 import String exposing (fromInt)
 
 
@@ -72,7 +74,7 @@ boolParser =
 
 
 type alias Id =
-    Int
+    String
 
 
 type Expr
@@ -84,31 +86,16 @@ type Expr
     | If Expr Expr Expr
 
 
-foldl1 : (a -> a -> a) -> NonEmptyList a -> a
-foldl1 f (NonEmpty x xs) =
-    foldl f x xs
-
-
-type NonEmptyList a
-    = NonEmpty a (List a)
-
-
 appParser : Parser Expr
 appParser =
-    succeed (foldl1 App)
-        |= appParserHelper
-
-
-appParserHelper : Parser (NonEmptyList Expr)
-appParserHelper =
-    succeed NonEmpty
+    succeed (foldl (\x y -> App y x))
         |= lazy (\_ -> nonAppParser)
         |. spaces
-        |= Parser.loop [] manyHelp
+        |= Parser.loop [] appParserHelper
 
 
-manyHelp : List Expr -> Parser (Step (List Expr) (List Expr))
-manyHelp xs =
+appParserHelper : List Expr -> Parser (Step (List Expr) (List Expr))
+appParserHelper xs =
     oneOf
         [ succeed (\x -> Loop (x :: xs))
             |= lazy (\_ -> nonAppParser)
@@ -139,9 +126,18 @@ betweenParens p =
         |. symbol ")"
 
 
+varIdParser : Parser String
+varIdParser =
+    variable
+        { start = Char.isLower
+        , inner = \c -> Char.isAlphaNum c || c == '_'
+        , reserved = Set.fromList [ "True", "False", "if", "then", "else", "zero", "succ", "pred", "isZero" ]
+        }
+
+
 varParser : Parser Expr
 varParser =
-    Parser.map Var int
+    Parser.map Var varIdParser
 
 
 absParser : Parser Expr
@@ -149,7 +145,7 @@ absParser =
     succeed Abs
         |. symbol "("
         |. symbol "\\"
-        |= int
+        |= varIdParser
         |. spaces
         |. symbol "."
         |. spaces
@@ -227,10 +223,10 @@ fromExpr : Expr -> String
 fromExpr expr =
     case expr of
         Var id ->
-            "x" ++ fromInt id
+            id
 
         Abs id expr2 ->
-            "(λx" ++ fromInt id ++ " . " ++ fromExpr expr2 ++ ")"
+            "(λ" ++ id ++ " . " ++ fromExpr expr2 ++ ")"
 
         App expr1 expr2 ->
             "(" ++ fromExpr expr1 ++ " " ++ fromExpr expr2 ++ ")"
