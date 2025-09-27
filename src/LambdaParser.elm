@@ -102,9 +102,6 @@ appParserHelper xs =
         [ succeed (\x -> Loop (x :: xs))
             |= lazy (\_ -> nonAppParser)
             |. spaces
-        -- , succeed (\x -> Loop (x :: xs))
-        --     |= lazy (\_ -> appParser)
-        --     |. spaces
         , succeed ()
             |> Parser.map (\_ -> Done (List.reverse xs))
         ]
@@ -117,7 +114,6 @@ nonAppParser =
         , Parser.map Bool boolParser
         , Parser.map Nat natParser
         , ifParser
-        -- absParser being last is important
         , absParser
         , betweenParens (lazy (\_ -> lambdaParser))
         ]
