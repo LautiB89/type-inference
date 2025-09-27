@@ -4,11 +4,15 @@ import Browser
 import Html exposing (Html, div, input, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
-import Parser exposing (Parser, DeadEnd, (|.), (|=), succeed, symbol, float, spaces, run, oneOf)
+import Parser exposing (Parser, DeadEnd, (|.), (|=), succeed, symbol, spaces, run, oneOf)
 import String exposing (fromInt)
 import Parser exposing (int)
 import Parser exposing (keyword)
 import Parser exposing (lazy)
+import List exposing (foldl)
+import Parser exposing (Trailing(..))
+import Parser exposing (Step)
+import Parser exposing (Step(..))
 
 -- MAIN
 
@@ -20,8 +24,6 @@ main =
 
 
 -- MODEL
-
-type Recec = Base | Next Recec
 
 type alias Model =
   { content : String  }
@@ -39,12 +41,13 @@ type BoolExpr =
 type alias Id = Int
 
 type Expr = 
-    Var Id | 
+    Var Id |
     Abs Id Expr |
-    App Expr Expr  |
+    App Expr Expr |
     Bool BoolExpr |
     Nat NatExpr |
     If Expr Expr Expr
+
 
 natExpr : Parser NatExpr
 natExpr =
@@ -77,52 +80,78 @@ boolExpr =
         |. symbol ")"
     ]
 
-lambdaExpr : Parser Expr
-lambdaExpr =
-  let
-    varExpr = Parser.map Var int
-    absExpr =
-      succeed Abs
-        |. symbol "("
-        |. symbol "\\"
-        |= int
-        |. spaces
-        |. keyword "->"
-        |. spaces
-        |= lazy (\_ -> lambdaExpr)
-        |. spaces
-        |. symbol ")"
-    appExpr = 
-      succeed App
-        |. symbol "("
-        |= lazy (\_ -> lambdaExpr)
-        |. spaces
-        |= lazy (\_ -> lambdaExpr)
-        |. symbol ")"
 
-    ifExpr =
-      succeed If
-        |. keyword "if"
-        |. spaces
-        |= lazy (\_ -> lambdaExpr)
-        |. spaces
-        |. keyword "then"
-        |. spaces
-        |= lazy (\_ -> lambdaExpr)
-        |. spaces
-        |. keyword "else"
-        |. spaces
-        |= lazy (\_ -> lambdaExpr)
+foldl1 : (a -> a -> a) -> NonEmptyList a -> a
+foldl1 f (NonEmpty x xs) = foldl f x xs
+ 
+type NonEmptyList a = NonEmpty a (List a)
 
-  in
-    oneOf [
-      varExpr,
+appExpr : Parser Expr
+appExpr = 
+  succeed (foldl1 App)
+    |= appExprHelper
+
+
+appExprHelper : Parser (NonEmptyList Expr)
+appExprHelper = 
+  succeed NonEmpty
+    |= lazy (\_ -> nonAppExpr)
+    |. spaces
+    |= Parser.loop [] manyHelp
+
+manyHelp : (List Expr) -> Parser (Step (List Expr) (List Expr))
+manyHelp xs =
+    oneOf
+        [ succeed (\x -> Loop (x :: xs))
+            |= lazy (\_ -> nonAppExpr)
+            |. spaces
+        , succeed ()
+            |> Parser.map (\_ -> Done (List.reverse xs))
+        ]
+
+nonAppExpr = 
+  oneOf 
+    [ varExpr,
       absExpr,
-      appExpr,
       Parser.map Bool boolExpr,
       Parser.map Nat natExpr,
       ifExpr
     ]
+
+
+lambdaExpr : Parser Expr
+lambdaExpr = 
+  oneOf [appExpr, nonAppExpr]
+
+varExpr = Parser.map Var int
+
+absExpr =
+  succeed Abs
+    |. symbol "("
+    |. symbol "\\"
+    |= int
+    |. spaces
+    |. keyword "->"
+    |. spaces
+    |= lazy (\_ -> lambdaExpr)
+    |. spaces
+    |. symbol ")"
+
+
+ifExpr =
+  succeed If
+    |. keyword "if"
+    |. spaces
+    |= lazy (\_ -> lambdaExpr)
+    |. spaces
+    |. keyword "then"
+    |. spaces
+    |= lazy (\_ -> lambdaExpr)
+    |. spaces
+    |. keyword "else"
+    |. spaces
+    |= lazy (\_ -> lambdaExpr)
+
 
 init : Model
 init =
@@ -143,11 +172,6 @@ update msg model =
 
 
 -- VIEW
-
-type Boolean
-  = MyTrue
-  | MyFalse
-  | MyOr Boolean Boolean
 
 view : Model -> Html Msg
 view model =
@@ -177,7 +201,7 @@ fromExpr : Expr -> String
 fromExpr expr = case expr of
   Var id ->  "x" ++ fromInt id
   Abs id expr2 -> "(\\x" ++ fromInt id ++ " -> " ++ fromExpr expr2 ++ ")"
-  App expr1 expr2  ->  fromExpr expr1 ++ " " ++ fromExpr expr2 
+  App expr1 expr2  ->  "(" ++ fromExpr expr1 ++ " " ++ fromExpr expr2 ++ ")" 
   Bool boolExpr1 -> fromBool boolExpr1 
   Nat natExpr1 -> fromNat natExpr1
   If expr1 expr2 expr3 -> 
