@@ -29,9 +29,7 @@ freeAndBoundedVars =
 
 
 
--- renameVar : Id -> Id -> Expr -> Expr
-
-
+renameVar : Id -> Id -> Expr -> Expr
 renameVar oldId newId =
     recrExpr
         (\id ->
@@ -102,7 +100,7 @@ rectifyHelper e freeVars boundedVars =
                     ( renamedExpr, bvs ) =
                         rectifyHelper (renameVar id newId expr) newFvs newBvs
                 in
-                ( Abs newId renamedExpr, bvs ) |> Debug.log (Debug.toString ( boundedVars, newBvs ))
+                ( Abs newId renamedExpr, bvs )
 
         App e1 e2 ->
             let
