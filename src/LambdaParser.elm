@@ -4,6 +4,7 @@ module LambdaParser exposing
     , NatExpr(..)
     , parse
     , rectify
+    , rectify2
     , viewExpr
     )
 
@@ -272,6 +273,8 @@ maybeParens s b =
     else
         s
 
+
+
 -- infer : Expr -> AlgorithmICtx -> (AlgorithmIRes, AlgorithmICtx)
 -- infer e ctx =
 --     let
@@ -289,6 +292,264 @@ maybeParens s b =
 --             Bool expr -> ({ }, {ctx})
 --             Nat expr -> ({}, {ctx})
 --             If expr expr expr -> ({}, {ctx})
+
+
+freeAndBoundedVars : Expr -> ( Set Id, Dict Id Int )
+freeAndBoundedVars e =
+    case e of
+        Var id ->
+            ( Set.singleton id, Dict.empty )
+
+        Abs id expr ->
+            let
+                ( free, bound ) =
+                    freeAndBoundedVars expr
+            in
+            ( Set.remove id free
+            , if Dict.member id bound then
+                Dict.update id (Maybe.map (\x -> x + 1)) bound
+
+              else
+                Dict.insert id 1 bound
+            )
+
+        App expr1 expr2 ->
+            let
+                ( free1, bound1 ) =
+                    freeAndBoundedVars expr1
+
+                ( free2, bound2 ) =
+                    freeAndBoundedVars expr2
+            in
+            ( Set.union free1 free2, combinee bound1 bound2 )
+
+        Bool expr ->
+            freeAndBoundedBoolVars expr
+
+        Nat expr ->
+            freeAndBoundedNatVars expr
+
+        If expr1 expr2 expr3 ->
+            let
+                ( free1, bound1 ) =
+                    freeAndBoundedVars expr1
+
+                ( free2, bound2 ) =
+                    freeAndBoundedVars expr2
+
+                ( free3, bound3 ) =
+                    freeAndBoundedVars expr3
+            in
+            ( Set.union free1 (Set.union free2 free3), combinee bound1 (combinee bound2 bound3) )
+
+
+combinee : Dict Id Int -> Dict Id Int -> Dict Id Int
+combinee =
+    Dict.foldr
+        (\k v rec ->
+            if Dict.member k rec then
+                Dict.update k (Maybe.map (\x -> x + v)) rec
+
+            else
+                Dict.insert k v rec
+        )
+
+
+freeAndBoundedBoolVars : BoolExpr -> ( Set Id, Dict Id Int )
+freeAndBoundedBoolVars e =
+    case e of
+        ConstTrue ->
+            ( Set.empty, Dict.empty )
+
+        ConstFalse ->
+            ( Set.empty, Dict.empty )
+
+        IsZero expr ->
+            freeAndBoundedVars expr
+
+
+freeAndBoundedNatVars : NatExpr -> ( Set Id, Dict Id Int )
+freeAndBoundedNatVars e =
+    case e of
+        ConstZero ->
+            ( Set.empty, Dict.empty )
+
+        Succ expr ->
+            freeAndBoundedVars expr
+
+        Pred expr ->
+            freeAndBoundedVars expr
+
+
+renameVar : Expr -> Id -> Id -> Expr
+renameVar expr oldId newId =
+    let
+        rec e =
+            renameVar e oldId newId
+
+        renameBoolVar bExpr =
+            case bExpr of
+                ConstTrue ->
+                    ConstTrue
+
+                ConstFalse ->
+                    ConstFalse
+
+                IsZero e ->
+                    IsZero (rec e)
+
+        renameNatVar nExpr =
+            case nExpr of
+                ConstZero ->
+                    ConstZero
+
+                Succ e ->
+                    Succ (rec e)
+
+                Pred e ->
+                    Pred (rec e)
+    in
+    case expr of
+        Var id ->
+            Var
+                (if id == oldId then
+                    newId
+
+                 else
+                    id
+                )
+
+        Abs id expr1 ->
+            Abs id
+                (if id == oldId then
+                    expr1
+
+                 else
+                    renameVar expr1 oldId newId
+                )
+
+        App expr1 expr2 ->
+            App (rec expr1) (rec expr2)
+
+        Bool bExpr ->
+            Bool (renameBoolVar bExpr)
+
+        Nat nExpr ->
+            Nat (renameNatVar nExpr)
+
+        If expr1 expr2 expr3 ->
+            If (rec expr1) (rec expr2) (rec expr3)
+
+
+rectifyHelper2 : Expr -> Set Id -> Dict Id Int -> ( Expr, Dict Id Int )
+rectifyHelper2 e freeVars boundedVars =
+    let
+        isFreeVar : Id -> Bool
+        isFreeVar vId =
+            Set.member vId freeVars
+
+        rec : Expr -> Dict Id Int -> ( Expr, Dict Id Int )
+        rec expr bvs =
+            rectifyHelper2 expr freeVars bvs
+    in
+    case e of
+        Var id ->
+            ( Var id, boundedVars )
+
+        Abs id expr ->
+            if (Dict.get id boundedVars == Just 1) && not (isFreeVar id) then
+                rectifyHelper2 expr freeVars boundedVars
+                    |> Tuple.mapFirst (Abs id)
+
+            else
+                let
+                    getId nId =
+                        id ++ fromInt nId
+
+                    newId =
+                        id
+                            ++ fromInt
+                                (until (\nId -> not (isFreeVar (getId nId)) && not (Dict.member (getId nId) boundedVars)) (\nId -> nId + 1) 1)
+
+                    newFvs =
+                        Set.insert newId freeVars
+
+                    newBvs =
+                        if Dict.get id boundedVars == Just 1 then
+                            Dict.remove id boundedVars
+                                |> Dict.insert newId 1
+
+                        else
+                            Dict.update id (Maybe.map (\x -> x - 1)) boundedVars
+                                |> Dict.insert newId 1
+
+                    ( renamedExpr, bvs ) =
+                        rectifyHelper2 (renameVar expr id newId) newFvs newBvs
+                in
+                ( Abs newId renamedExpr, bvs ) |> Debug.log (Debug.toString ( boundedVars, newBvs ))
+
+        App e1 e2 ->
+            let
+                ( ne1, bv1 ) =
+                    rec e1 boundedVars
+
+                ( ne2, bv2 ) =
+                    rec e2 bv1
+            in
+            ( App ne1 ne2, bv2 )
+
+        Bool expr ->
+            let
+                ( expr2, bv1 ) =
+                    rectifyHelper2Bool expr freeVars boundedVars
+            in
+            ( Bool expr2, bv1 )
+
+        Nat expr ->
+            let
+                ( expr2, bv1 ) =
+                    rectifyHelper2Nat expr freeVars boundedVars
+            in
+            ( Nat expr2, bv1 )
+
+        If expr1 expr2 expr3 ->
+            let
+                ( ne1, bv1 ) =
+                    rec expr1 boundedVars
+
+                ( ne2, bv2 ) =
+                    rec expr2 bv1
+
+                ( ne3, bv3 ) =
+                    rec expr3 bv2
+            in
+            ( If ne1 ne2 ne3, bv3 )
+
+
+rectifyHelper2Bool : BoolExpr -> Set Id -> Dict Id Int -> ( BoolExpr, Dict Id Int )
+rectifyHelper2Bool e freeVars boundedVars =
+    case e of
+        ConstTrue ->
+            ( ConstTrue, Dict.empty )
+
+        ConstFalse ->
+            ( ConstFalse, Dict.empty )
+
+        IsZero expr ->
+            Tuple.mapFirst IsZero (rectifyHelper2 expr freeVars boundedVars)
+
+
+rectifyHelper2Nat : NatExpr -> Set Id -> Dict Id Int -> ( NatExpr, Dict Id Int )
+rectifyHelper2Nat e freeVars boundedVars =
+    case e of
+        ConstZero ->
+            ( ConstZero, Dict.empty )
+
+        Succ expr ->
+            Tuple.mapFirst Succ (rectifyHelper2 expr freeVars boundedVars)
+
+        Pred expr ->
+            Tuple.mapFirst Pred (rectifyHelper2 expr freeVars boundedVars)
 
 
 freeExprVars : Expr -> Set Id
@@ -461,6 +722,21 @@ rectify e =
     rectifyHelper e fv Dict.empty 1 |> Tuple.first
 
 
+rectify2 : Expr -> Expr
+rectify2 e =
+    let
+        ( fv, bv ) =
+            freeAndBoundedVars e
+    in
+    rectifyHelper2 e fv bv
+        |> Tuple.first
+        |> Debug.log
+            (Debug.toString
+                ( fv
+                , bv
+                )
+            )
+
 
 
 --- Type infer
@@ -501,5 +777,7 @@ type alias AlgorithmICtx =
     , setRestriction : Set Restriction
     , nextFreshVar : Int
     }
+
+
 
 -- decorate : Expr -> (TypedExpr)
