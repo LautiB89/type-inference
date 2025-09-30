@@ -6,7 +6,6 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import LambdaParser exposing (parse, viewExpr)
 import MinRectify exposing (minRectify)
-import NaiveRectify exposing (naiveRectify)
 
 
 
@@ -99,16 +98,7 @@ view model =
             , style "font-family" "monospace"
             ]
             [ text (viewExpr model.showImplicitParens (parse model.content)) ]
-        , h3 [] [ text "Naive rectified output:" ]
-        , div
-            [ style "background" "#f9f9f9"
-            , style "padding" "12px"
-            , style "border-radius" "4px"
-            , style "min-height" "40px"
-            , style "font-family" "monospace"
-            ]
-            [ text (viewExpr model.showImplicitParens (Result.map naiveRectify (parse model.content))) ]
-        , h3 [] [ text "Min renames rectified output:" ]
+        , h3 [] [ text "Rectified output:" ]
         , div
             [ style "background" "#f9f9f9"
             , style "padding" "12px"

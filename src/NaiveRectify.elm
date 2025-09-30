@@ -1,63 +1,25 @@
 module NaiveRectify exposing (naiveRectify)
 
-import LambdaParser
-    exposing
-        ( BoolExpr(..)
-        , Expr(..)
-        , Id
-        , NatExpr(..)
-        )
+import Dict exposing (Dict)
+import Expr exposing (Expr(..), Id, foldrExpr)
 import Set exposing (Set)
 import String exposing (fromInt)
 import Utils exposing (until)
-import Dict exposing (Dict)
+
 
 freeExprVars : Expr -> Set Id
-freeExprVars e =
-    case e of
-        Var id ->
-            Set.singleton id
-
-        Abs id expr ->
-            Set.remove id (freeExprVars expr)
-
-        App expr1 expr2 ->
-            Set.union (freeExprVars expr1) (freeExprVars expr2)
-
-        Bool expr ->
-            freeBoolVars expr
-
-        Nat expr ->
-            freeNatVars expr
-
-        If expr1 expr2 expr3 ->
-            Set.union (freeExprVars expr1) (Set.union (freeExprVars expr2) (freeExprVars expr3))
-
-
-freeBoolVars : BoolExpr -> Set Id
-freeBoolVars e =
-    case e of
-        ConstTrue ->
-            Set.empty
-
-        ConstFalse ->
-            Set.empty
-
-        IsZero expr ->
-            freeExprVars expr
-
-
-freeNatVars : NatExpr -> Set Id
-freeNatVars e =
-    case e of
-        ConstZero ->
-            Set.empty
-
-        Succ expr ->
-            freeExprVars expr
-
-        Pred expr ->
-            freeExprVars expr
+freeExprVars =
+    foldrExpr
+        Set.singleton
+        (\id rec -> Set.remove id rec)
+        (\rec1 rec2 -> Set.union rec1 rec2)
+        Set.empty
+        Set.empty
+        identity
+        Set.empty
+        identity
+        identity
+        (\rec1 rec2 rec3 -> Set.union rec1 (Set.union rec2 rec3))
 
 
 rectifyHelper : Expr -> Set Id -> Dict Id Int -> Int -> ( Expr, Int )
@@ -110,19 +72,23 @@ rectifyHelper e freeVars renames n =
             in
             ( App ne1 ne2, n2 )
 
-        Bool expr ->
-            let
-                ( expr2, n2 ) =
-                    rectifyHelperBool expr freeVars renames n
-            in
-            ( Bool expr2, n2 )
+        ConstTrue ->
+            ( ConstTrue, n )
 
-        Nat expr ->
-            let
-                ( expr2, n2 ) =
-                    rectifyHelperNat expr freeVars renames n
-            in
-            ( Nat expr2, n2 )
+        ConstFalse ->
+            ( ConstFalse, n )
+
+        IsZero expr ->
+            Tuple.mapFirst IsZero (rectifyHelper expr freeVars renames n)
+
+        ConstZero ->
+            ( ConstZero, n )
+
+        Succ expr ->
+            Tuple.mapFirst Succ (rectifyHelper expr freeVars renames n)
+
+        Pred expr ->
+            Tuple.mapFirst Pred (rectifyHelper expr freeVars renames n)
 
         If expr1 expr2 expr3 ->
             let
@@ -138,32 +104,6 @@ rectifyHelper e freeVars renames n =
             ( If ne1 ne2 ne3, n3 )
 
 
-rectifyHelperBool : BoolExpr -> Set Id -> Dict Id Int -> Int -> ( BoolExpr, Int )
-rectifyHelperBool e freeVars renames n =
-    case e of
-        ConstTrue ->
-            ( ConstTrue, n )
-
-        ConstFalse ->
-            ( ConstFalse, n )
-
-        IsZero expr ->
-            Tuple.mapFirst IsZero (rectifyHelper expr freeVars renames n)
-
-
-rectifyHelperNat : NatExpr -> Set Id -> Dict Id Int -> Int -> ( NatExpr, Int )
-rectifyHelperNat e freeVars renames n =
-    case e of
-        ConstZero ->
-            ( ConstZero, n )
-
-        Succ expr ->
-            Tuple.mapFirst Succ (rectifyHelper expr freeVars renames n)
-
-        Pred expr ->
-            Tuple.mapFirst Pred (rectifyHelper expr freeVars renames n)
-
-
 naiveRectify : Expr -> Expr
 naiveRectify e =
     let
@@ -171,4 +111,3 @@ naiveRectify e =
             freeExprVars e
     in
     rectifyHelper e fv Dict.empty 1 |> Tuple.first
-

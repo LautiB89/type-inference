@@ -1,7 +1,8 @@
 module LambdaParserTest exposing (suite)
 
 import Expect
-import LambdaParser exposing (BoolExpr(..), Expr(..), NatExpr(..), parse)
+import Expr exposing (Expr(..))
+import LambdaParser exposing (parse)
 import Test exposing (Test, describe, test)
 
 
@@ -36,19 +37,19 @@ natParseTest =
     describe "natParser"
         [ test "zero" <|
             \_ ->
-                Expect.equal (parse "zero") (Ok (Nat ConstZero))
+                Expect.equal (parse "zero") (Ok ConstZero)
         , test "succ" <|
             \_ ->
-                Expect.equal (parse "succ(zero)") (Ok (Nat (Succ (Nat ConstZero))))
+                Expect.equal (parse "succ(zero)") (Ok (Succ ConstZero))
         , test "pred" <|
             \_ ->
-                Expect.equal (parse "pred(zero)") (Ok (Nat (Pred (Nat ConstZero))))
+                Expect.equal (parse "pred(zero)") (Ok (Pred ConstZero))
         , test "succ of some applications" <|
             \_ ->
-                Expect.equal (parse "succ(x y z)") (Ok (Nat (Succ (App (App (Var "x") (Var "y")) (Var "z")))))
+                Expect.equal (parse "succ(x y z)") (Ok (Succ (App (App (Var "x") (Var "y")) (Var "z"))))
         , test "pred of succ of var" <|
             \_ ->
-                Expect.equal (parse "pred(succ(y_1))") (Ok (Nat (Pred (Nat (Succ (Var "y_1"))))))
+                Expect.equal (parse "pred(succ(y_1))") (Ok (Pred (Succ (Var "y_1"))))
         ]
 
 
@@ -57,16 +58,16 @@ boolParseTest =
     describe "boolParser"
         [ test "true" <|
             \_ ->
-                Expect.equal (parse "true") (Ok (Bool ConstTrue))
+                Expect.equal (parse "true") (Ok ConstTrue)
         , test "false" <|
             \_ ->
-                Expect.equal (parse "false") (Ok (Bool ConstFalse))
+                Expect.equal (parse "false") (Ok ConstFalse)
         , test "isZero" <|
             \_ ->
-                Expect.equal (parse "isZero(zero)") (Ok (Bool (IsZero (Nat ConstZero))))
+                Expect.equal (parse "isZero(zero)") (Ok (IsZero ConstZero))
         , test "isZero of a wrong application" <|
             \_ ->
-                Expect.equal (parse "isZero(false x1)") (Ok (Bool (IsZero (App (Bool ConstFalse) (Var "x1")))))
+                Expect.equal (parse "isZero(false x1)") (Ok (IsZero (App ConstFalse (Var "x1"))))
         ]
 
 
