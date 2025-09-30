@@ -1,10 +1,10 @@
 module LambdaParser exposing
     ( parse
     , viewExpr
+    , viewTypedExpr
     )
 
-import Expr exposing (Id, Expr(..), fromExpr)
-import Dict exposing (Dict)
+import Expr exposing (Expr(..), fromExpr)
 import List exposing (foldl)
 import Parser
     exposing
@@ -24,7 +24,8 @@ import Parser
         , symbol
         , variable
         )
-import Set exposing (Set)
+import Set
+import TypedExpr exposing (TypedExpr, fromTypedExpr)
 
 
 
@@ -49,7 +50,6 @@ natParser =
 --- Bool
 
 
-
 boolParser : Parser Expr
 boolParser =
     oneOf
@@ -61,7 +61,6 @@ boolParser =
             |. keyword "isZero"
             |= betweenParens (lazy (\_ -> lambdaParser))
         ]
-
 
 
 appParser : Parser Expr
@@ -170,6 +169,17 @@ viewExpr showImplicitParens res =
             "Parsing failed"
 
 
+viewTypedExpr : Bool -> Result (List DeadEnd) TypedExpr -> String
+viewTypedExpr showImplicitParens res =
+    case res of
+        Ok expr ->
+            fromTypedExpr showImplicitParens expr
+
+        Err _ ->
+            "Parsing failed"
+
+
+
 -- infer : Expr -> AlgorithmICtx -> (AlgorithmIRes, AlgorithmICtx)
 -- infer e ctx =
 --     let
@@ -188,48 +198,3 @@ viewExpr showImplicitParens res =
 --             Nat expr -> ({}, {ctx})
 --             If expr expr expr -> ({}, {ctx})
 --- Type infer
-
-
-type Type
-    = TVar Int
-    | TNat
-    | TBool
-    | TAbs Type Type
-
-
-type TypedExpr
-    = TEVar Id
-    | TEAbs Id Expr
-    | TEApp Expr Expr
-    | TEConstTrue
-    | TEConstFalse
-    | TEIsZero Expr
-    | TEConstZero
-    | TESucc Expr
-    | TEPred Expr
-    | TEIf Expr Expr Expr
-
-
-type alias Context =
-    Dict Id Type
-
-
-type Restriction
-    = Unifies Type Type
-
-
-type alias AlgorithmIRes =
-    { typedExpr : TypedExpr
-    , exprType : Type
-    }
-
-
-type alias AlgorithmICtx =
-    { context : Context
-    , setRestriction : Set Restriction
-    , nextFreshVar : Int
-    }
-
-
-
--- decorate : Expr -> (TypedExpr)

@@ -4,8 +4,9 @@ import Browser
 import Html exposing (Html, button, div, h2, h3, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
-import LambdaParser exposing (parse, viewExpr)
+import LambdaParser exposing (parse, viewExpr, viewTypedExpr)
 import MinRectify exposing (minRectify)
+import TypedExpr exposing (decorate)
 
 
 
@@ -107,4 +108,13 @@ view model =
             , style "font-family" "monospace"
             ]
             [ text (viewExpr model.showImplicitParens (Result.map minRectify (parse model.content))) ]
+        , h3 [] [ text "Anotated output:" ]
+        , div
+            [ style "background" "#f9f9f9"
+            , style "padding" "12px"
+            , style "border-radius" "4px"
+            , style "min-height" "40px"
+            , style "font-family" "monospace"
+            ]
+            [ text (viewTypedExpr model.showImplicitParens (Result.map (\te -> Tuple.second (decorate (minRectify te))) (parse model.content))) ]
         ]
