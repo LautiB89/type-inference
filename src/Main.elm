@@ -4,7 +4,7 @@ import Browser
 import Html exposing (Html, button, div, h2, h3, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
-import LambdaParser exposing (parse, viewExpr)
+import LambdaParser exposing (parse, viewExpr, rectify)
 
 
 
@@ -97,4 +97,13 @@ view model =
             , style "font-family" "monospace"
             ]
             [ text (viewExpr model.showImplicitParens (parse model.content)) ]
+        , h3 [] [ text "Rectified output:" ]
+        , div
+            [ style "background" "#f9f9f9"
+            , style "padding" "12px"
+            , style "border-radius" "4px"
+            , style "min-height" "40px"
+            , style "font-family" "monospace"
+            ]
+            [ text (viewExpr model.showImplicitParens (Result.map rectify (parse model.content))) ]
         ]
