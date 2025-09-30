@@ -4,7 +4,9 @@ import Browser
 import Html exposing (Html, button, div, h2, h3, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
-import LambdaParser exposing (parse, viewExpr, rectify, rectify2)
+import LambdaParser exposing (parse, viewExpr)
+import MinRectify exposing (minRectify)
+import NaiveRectify exposing (naiveRectify)
 
 
 
@@ -97,7 +99,7 @@ view model =
             , style "font-family" "monospace"
             ]
             [ text (viewExpr model.showImplicitParens (parse model.content)) ]
-        , h3 [] [ text "Rectified output:" ]
+        , h3 [] [ text "Naive rectified output:" ]
         , div
             [ style "background" "#f9f9f9"
             , style "padding" "12px"
@@ -105,8 +107,8 @@ view model =
             , style "min-height" "40px"
             , style "font-family" "monospace"
             ]
-            [ text (viewExpr model.showImplicitParens (Result.map rectify (parse model.content))) ]
-        , h3 [] [ text "2 Rectified output:" ]
+            [ text (viewExpr model.showImplicitParens (Result.map naiveRectify (parse model.content))) ]
+        , h3 [] [ text "Min renames rectified output:" ]
         , div
             [ style "background" "#f9f9f9"
             , style "padding" "12px"
@@ -114,5 +116,5 @@ view model =
             , style "min-height" "40px"
             , style "font-family" "monospace"
             ]
-            [ text (viewExpr model.showImplicitParens (Result.map rectify2 (parse model.content))) ]
+            [ text (viewExpr model.showImplicitParens (Result.map minRectify (parse model.content))) ]
         ]
