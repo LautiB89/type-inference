@@ -113,7 +113,16 @@ mgu ys =
                                 mgu xs
 
                             else
-                                mgu (insert ( s2, s1 ) xs)
+                                mgu (List.map (Tuple.mapBoth (replaceVar n s2) (replaceVar n s2)) xs)
+                                    |> Result.map
+                                        (\s ->
+                                            \i ->
+                                                if i == n then
+                                                    s2
+
+                                                else
+                                                    s i
+                                        )
 
                         _ ->
                             if hasVar n s2 then
