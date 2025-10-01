@@ -63,10 +63,11 @@ decorateHelper expr n =
 
         Abs id e ->
             let
+                n1 = n + 1
                 ( rec, n2 ) =
-                    decorateHelper e n
+                    decorateHelper e n1
             in
-            ( TEAbs id (TVar n2) rec, n2 + 1 )
+            ( TEAbs id (TVar n) rec, n2 )
 
         App e1 e2 ->
             let
