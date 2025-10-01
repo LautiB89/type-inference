@@ -9,10 +9,12 @@ module Restrictions exposing
     , remove
     , singleton
     , union
+    , simplifySubstitution
+    , substitute
     )
 
 import List
-import Type exposing (Type(..), fromType, hasVar, replaceVar)
+import Type exposing (Type(..), foldType, fromType, hasVar, replaceVar)
 
 
 type alias Restriction =
@@ -139,6 +141,36 @@ mgu ys =
                                                 else
                                                     s i
                                         )
+
+
+simplifySubstitution : Substitution -> Substitution
+simplifySubstitution s =
+    \n ->
+        let
+            t =
+                s n
+        in
+        case t of
+            TNat ->
+                TNat
+
+            TBool ->
+                TBool
+
+            TVar m ->
+                if m == n then
+                    TVar n
+
+                else
+                    s m
+
+            TAbs t1 t2 ->
+                TAbs (substitute s t1) (substitute s t2)
+
+
+substitute : Substitution -> Type -> Type
+substitute s =
+    foldType s TNat TBool TAbs
 
 
 
