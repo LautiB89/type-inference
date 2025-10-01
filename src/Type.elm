@@ -1,6 +1,7 @@
 module Type exposing (..)
 
 import String exposing (fromInt)
+import Utils exposing (maybeParens)
 
 
 type Type
@@ -49,8 +50,12 @@ fromType t =
             "Bool"
 
         TAbs t1 t2 ->
-            fromType t1 ++ "⭢" ++ fromType t2
+            maybeParens (fromType t1) (isAbs t1) ++ "⭢" ++ fromType t2
 
+isAbs : Type -> Bool
+isAbs t = case t of
+    TAbs _ _ -> True
+    _ -> False
 
 replaceVar : Int -> Type -> Type -> Type
 replaceVar n t =

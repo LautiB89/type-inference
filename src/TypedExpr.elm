@@ -6,6 +6,7 @@ import NaiveRectify exposing (freeExprVars)
 import Restrictions exposing (Restrictions)
 import Set
 import Type exposing (Type(..), fromType)
+import Utils exposing (maybeParens)
 
 
 type TypedExpr
@@ -247,14 +248,6 @@ fromTypedExpr showImplicitParens =
         )
 
 
-maybeParens : String -> Bool -> String
-maybeParens s b =
-    if b then
-        "(" ++ s ++ ")"
-
-    else
-        s
-
 
 isApp : TypedExpr -> Bool
 isApp expr =
@@ -344,3 +337,4 @@ infer e context n =
                                             )
                                 )
                     )
+
