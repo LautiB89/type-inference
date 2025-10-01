@@ -49,7 +49,7 @@ fromType t =
             "Bool"
 
         TAbs t1 t2 ->
-            fromType t1 ++ " -> " ++ fromType t2
+            fromType t1 ++ "⭢" ++ fromType t2
 
 
 replaceVar : Int -> Type -> Type -> Type
