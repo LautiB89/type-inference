@@ -7,11 +7,9 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
-import Restrictions exposing (Restrictions, Substitution, fromRestrictions, mgu)
+import Restrictions exposing (Restrictions, Substitution, fromRestrictions, mgu, simplifySubstitution)
 import Type exposing (Type, fromType)
 import TypedExpr exposing (Context, TypedExpr, decorate, fromContext, fromTypedExpr, infer)
-import Restrictions exposing (simplifySubstitution)
-import Html exposing (h4)
 
 
 
@@ -136,7 +134,12 @@ view model =
         aaa =
             fullTrace model.content
     in
-    div [ style "max-width" "600px", style "margin" "40px auto", style "font-family" "sans-serif", style "font-size" "24px" ]
+    div
+        [ style "max-width" "600px"
+        , style "margin" "40px auto"
+        , style "font-family" "sans-serif"
+        , style "font-size" "24px"
+        ]
         [ h2 [] [ text "λ-Calculus parser" ]
         , textarea
             [ value model.content
@@ -145,6 +148,7 @@ view model =
             , rows 4
             , cols 60
             , style "margin-bottom" "12px"
+            , style "font-size" "16px"
             ]
             []
         , div [ style "margin-bottom" "12px" ]
