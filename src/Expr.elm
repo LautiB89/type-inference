@@ -123,7 +123,7 @@ fromExpr showImplicitParens =
         (\id -> id)
         (\id _ rec -> "(λ" ++ id ++ " . " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
-            maybeParens rec1 (isApp e1 && showImplicitParens) ++ " " ++ maybeParens rec2 (isApp e2)
+            maybeParens rec1 (isApp e1 && isIf e1 && showImplicitParens) ++ " " ++ maybeParens rec2 (isApp e2)
         )
         "true"
         "false"
@@ -153,6 +153,15 @@ isApp : Expr -> Bool
 isApp expr =
     case expr of
         App _ _ ->
+            True
+
+        _ ->
+            False
+
+isIf : Expr -> Bool
+isIf expr =
+    case expr of
+        If _ _ _ ->
             True
 
         _ ->
