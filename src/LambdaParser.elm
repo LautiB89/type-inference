@@ -177,24 +177,3 @@ viewTypedExpr showImplicitParens res =
 
         Err _ ->
             "Parsing failed"
-
-
-
--- infer : Expr -> AlgorithmICtx -> (AlgorithmIRes, AlgorithmICtx)
--- infer e ctx =
---     let
---         freshVarNat = ctx.nextFreshVar
---     in
---         case e of
---             Var id ->
---                 ({ typedExpr = (TEVar id), exprType = TVar freshVarNat}, { ctx | context = insert id freshVarNat, nextFreshVar = freshVarNat + 1  })
---             Abs id expr ->
---                 let
---                     (recRes, recCtx) = infer expr { ctx | context = remove id context }
---                 in
---                     ({ typedExpr = TEAbs id (TVar freshVarNat) (recRes.typedExpr) }, recCtx)
---             App expr expr -> ({}, {ctx})
---             Bool expr -> ({ }, {ctx})
---             Nat expr -> ({}, {ctx})
---             If expr expr expr -> ({}, {ctx})
---- Type infer

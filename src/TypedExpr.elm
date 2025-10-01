@@ -28,24 +28,6 @@ type TypedExpr
 type alias Context =
     Dict Id Type
 
-
-type Restriction
-    = Unifies Type Type
-
-
-type alias AlgorithmIRes =
-    { typedExpr : TypedExpr
-    , exprType : Type
-    }
-
-
-type alias AlgorithmICtx =
-    { context : Context
-    , setRestriction : Set Restriction
-    , nextFreshVar : Int
-    }
-
-
 exprContext : Expr -> ( Int, Context )
 exprContext expr =
     freeExprVars expr
@@ -260,3 +242,88 @@ isApp expr =
 
         _ ->
             False
+
+
+type Restriction
+    = Unifies Type Type
+
+infer : TypedExpr -> Context -> Int -> (Maybe Type, Set Restriction, Int)
+infer e context n =
+    case e of
+        TEVar id ->
+            (Dict.get id context, Set.empty, n)
+                
+        TEAbs id varType expr ->
+            let
+                (mt, r1, n1) = infer expr (Dict.insert id varType context) n
+            in
+                (Maybe.map (\bodyType -> TAbs varType bodyType) mt, r1, n1)
+        TEApp e1 e2 ->
+            let
+                (me1, r1, n1) = infer e1 context n
+                (me2, r2, n2) = infer e2 context n1
+                n3 = n2 + 1
+                freshVar = TVar n2
+                
+            in
+                Maybe.map2 
+                    (\type1 type2 -> 
+                        ( freshVar
+                        , Set.insert (Unifies type1 (TAbs type2 freshVar)) (Set.union r1 r2)
+                        , n3
+                        )
+                    )
+                    me1 
+                    me2
+        TEConstTrue -> (TBool, Set.empty, n)
+        TEConstFalse -> (TBool, Set.empty, n)
+        IsZero e1 -> 
+            let
+                (mt, r1, n1) = infer e1 context n
+            in
+                Maybe.map 
+                    (\bodyType -> 
+                        (TBool, Set.insert (Unifies bodyType TNat) r1, n1)
+                    )
+                    mt
+        ConstZero -> (TNat, Set.empty, n)
+
+        Succ e1 ->
+            let
+                (mt, r1, n1) = infer e1 context n
+            in
+                Maybe.map 
+                    (\bodyType -> 
+                        (TNat, Set.insert (Unifies bodyType TNat) r1, n1)
+                    )
+                    mt
+        Pred e1 ->
+            let
+                (mt, r1, n1) = infer e1 context n
+            in
+                Maybe.map 
+                    (\bodyType -> 
+                        (TNat, Set.insert (Unifies bodyType TNat) r1, n1)
+                    )
+                    mt
+
+        TEIf e1 e2 e3 -> 
+            let
+                (me1, r1, n1) = infer e1 context n
+                (me2, r2, n2) = infer e2 context n1
+                (me3, r3, n3) = infer e3 context n2
+                
+            in
+                Maybe.map3 
+                    (\type1 type2 type3 -> 
+                        ( type2
+                        , Set.union r1 r2
+                            |> Set.union r3
+                            |> Set.insert (Unifies type1 TBool) 
+                            |> Set.insert (Unifies type2 type3) 
+                        , n3
+                        )
+                    )
+                    me1 
+                    me2
+                    me3

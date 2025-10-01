@@ -7,8 +7,8 @@ import String exposing (fromInt)
 import Utils exposing (until)
 
 
-freeAndBoundedVars : Expr -> ( Set Id, Multiset Id )
-freeAndBoundedVars =
+freeAndBoundVars : Expr -> ( Set Id, Multiset Id )
+freeAndBoundVars =
     foldrExpr
         (\id -> ( Set.singleton id, Multiset.empty ))
         (\id ( free, bound ) ->
@@ -148,7 +148,7 @@ minRectify : Expr -> Expr
 minRectify e =
     let
         ( fv, bv ) =
-            freeAndBoundedVars e
+            freeAndBoundVars e
     in
     rectifyHelper e fv bv
         |> Tuple.first
