@@ -67,18 +67,20 @@ update msg model =
 -- VIEW
 
 
-expressionViewer : String -> String -> Html Msg
-expressionViewer title s =
+stepDiv : String -> List (Html Msg) -> Html Msg
+stepDiv title xs =
     div []
         [ h4 [] [ text title ]
         , div
             [ style "background" "#f9f9f9"
-            , style "padding" "12px"
+            , style "padding" "4px"
             , style "border-radius" "4px"
             , style "min-height" "40px"
             , style "font-family" "monospace"
+            , style "display" "flex"
+            , style "flex-direction" "column"
             ]
-            [ text s ]
+            xs
         ]
 
 
@@ -152,7 +154,7 @@ view model =
         [ style "max-width" "600px"
         , style "margin" "40px auto"
         , style "font-family" "sans-serif"
-        , style "font-size" "24px"
+        , style "font-size" "16px"
         ]
         [ h2 [] [ text "Algoritmo I" ]
         , textarea
@@ -182,78 +184,26 @@ view model =
             ]
         , case aaa of
             Err err ->
-                div
-                    [ style "background" "#f9f9f9"
-                    , style "padding" "12px"
-                    , style "border-radius" "4px"
-                    , style "min-height" "40px"
-                    , style "font-family" "monospace"
-                    ]
-                    [ text err ]
+                stepDiv "Ocurrió un error" [ text err ]
 
             Ok { ctx, rectified, res, sus, t, typed, untyped, nextFreshN } ->
                 div []
-                    [ expressionViewer "0. Término sin tipo" (fromExpr model.showImplicitParens untyped)
-                    , expressionViewer "1. Rectificación" (fromExpr model.showImplicitParens rectified)
-                    , div []
-                        [ h4 [] [ text "2. Anotación" ]
-                        , div
-                            [ style "background" "#f9f9f9"
-                            , style "padding" "12px"
-                            , style "border-radius" "4px"
-                            , style "min-height" "40px"
-                            , style "font-family" "monospace"
-                            , style "display" "flex"
-                            , style "flex-direction" "column"
-                            ]
-                            [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens typed) ]
-                            , div [] [ text ("Γ0: " ++ fromContext ctx) ]
-                            ]
+                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens untyped) ]
+                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens rectified) ]
+                    , stepDiv "2. Anotación"
+                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens typed) ]
+                        , div [] [ text ("Γ0: " ++ fromContext ctx) ]
                         ]
-                    , div []
-                        [ h4 [] [ text "3. Generación de restricciones" ]
-                        , div
-                            [ style "background" "#f9f9f9"
-                            , style "padding" "12px"
-                            , style "border-radius" "4px"
-                            , style "min-height" "40px"
-                            , style "font-family" "monospace"
-                            , style "display" "flex"
-                            , style "flex-direction" "column"
-                            ]
-                            [ div [] [ text ("Tipo: " ++ fromType t) ]
-                            , div [] [ text ("Restricciones: " ++ fromRestrictions res) ]
-                            ]
+                    , stepDiv "3. Generación de restricciones"
+                        [ div [] [ text ("Tipo: " ++ fromType t) ]
+                        , div [] [ text ("Restricciones: " ++ fromRestrictions res) ]
                         ]
-                    , div []
-                        [ h4 [] [ text "4. Unificación" ]
-                        , div
-                            [ style "background" "#f9f9f9"
-                            , style "padding" "12px"
-                            , style "border-radius" "4px"
-                            , style "min-height" "40px"
-                            , style "font-family" "monospace"
-                            , style "display" "flex"
-                            , style "flex-direction" "column"
-                            ]
-                            [ div [] [ text ("Sustitución: " ++ fromSubstitution sus nextFreshN) ]
-                            ]
-                        ]
-                    , div []
-                        [ h4 [] [ text "Resultado" ]
-                        , div
-                            [ style "background" "#f9f9f9"
-                            , style "padding" "12px"
-                            , style "border-radius" "4px"
-                            , style "min-height" "40px"
-                            , style "font-family" "monospace"
-                            , style "display" "flex"
-                            , style "flex-direction" "column"
-                            ]
-                            [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute sus t1) ctx)) ]
-                            , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr sus typed)) ]
-                            , div [] [ text ("Tipo: " ++ fromType (substitute sus t)) ]
-                            ]
+                    , stepDiv "4. Unificación"
+                        [ div [] [ text ("Sustitución: " ++ fromSubstitution sus nextFreshN) ] ]
+                    , stepDiv "Resultado"
+                        [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute sus t1) ctx)) ]
+                        , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr sus typed)) ]
+                        , div [] [ text ("Tipo: " ++ fromType (substitute sus t)) ]
                         ]
                     ]
         ]
