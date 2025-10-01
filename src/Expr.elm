@@ -1,5 +1,7 @@
 module Expr exposing (..)
+
 import Utils exposing (maybeParens)
+
 
 type alias Id =
     String
@@ -124,7 +126,7 @@ fromExpr showImplicitParens =
         (\id -> id)
         (\id _ rec -> "(λ" ++ id ++ " . " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
-            maybeParens rec1 (isApp e1 && isIf e1 && showImplicitParens) ++ " " ++ maybeParens rec2 (isApp e2)
+            maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)
         )
         "true"
         "false"
@@ -150,6 +152,7 @@ isApp expr =
 
         _ ->
             False
+
 
 isIf : Expr -> Bool
 isIf expr =

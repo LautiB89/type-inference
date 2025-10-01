@@ -31,7 +31,7 @@ fromContext c =
     let
         res =
             Dict.toList c
-                |> List.map (\(id, t) -> id ++ ":" ++ fromType t)
+                |> List.map (\( id, t ) -> id ++ ":" ++ fromType t)
                 |> List.intersperse ", "
                 |> List.foldr (\x y -> x ++ y) ""
     in
@@ -64,7 +64,9 @@ decorateHelper expr n =
 
         Abs id e ->
             let
-                n1 = n + 1
+                n1 =
+                    n + 1
+
                 ( rec, n2 ) =
                     decorateHelper e n1
             in
@@ -230,7 +232,7 @@ fromTypedExpr showImplicitParens =
         (\id -> id)
         (\id t _ rec -> "(λ" ++ id ++ " : " ++ fromType t ++ " . " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
-            maybeParens rec1 (isApp e1 && showImplicitParens) ++ " " ++ maybeParens rec2 (isApp e2)
+            maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)
         )
         "true"
         "false"
@@ -248,11 +250,20 @@ fromTypedExpr showImplicitParens =
         )
 
 
-
 isApp : TypedExpr -> Bool
 isApp expr =
     case expr of
         TEApp _ _ ->
+            True
+
+        _ ->
+            False
+
+
+isIf : TypedExpr -> Bool
+isIf expr =
+    case expr of
+        TEIf _ _ _ ->
             True
 
         _ ->
@@ -337,4 +348,3 @@ infer e context n =
                                             )
                                 )
                     )
-

@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Browser
 import Dict
-import Expr exposing (Expr, foldrExpr, fromExpr)
+import Expr exposing (Expr, fromExpr)
 import Html exposing (Html, button, div, h2, h4, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
@@ -177,7 +177,7 @@ view model =
                 , style "cursor" "pointer"
                 ]
                 [ text
-                    (ifShowParens "Mostrar" "Esconder" ++ " paréntesis implícitos")
+                    (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
                 ]
             ]
         , case aaa of
