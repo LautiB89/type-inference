@@ -49,7 +49,7 @@ natDecorateTest =
             \_ ->
                 Expect.equal
                     (decorate (Succ (App (App (Var "x") (Var "y")) (Var "z"))))
-                    ( Dict.fromList [ ( "x", TVar 3 ), ( "y", TVar 2 ), ( "z", TVar 1 ) ]
+                    ( Dict.fromList [ ( "x", TVar 1 ), ( "y", TVar 2 ), ( "z", TVar 3 ) ]
                     , TESucc (TEApp (TEApp (TEVar "x") (TEVar "y")) (TEVar "z"))
                     , 4
                     )

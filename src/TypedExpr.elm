@@ -40,7 +40,7 @@ fromContext c =
 exprContext : Expr -> ( Int, Context )
 exprContext expr =
     freeExprVars expr
-        |> Set.foldr (\x ( n, d ) -> ( n + 1, Dict.insert x (TVar n) d )) ( 1, Dict.empty )
+        |> Set.foldl (\x ( n, d ) -> ( n + 1, Dict.insert x (TVar n) d )) ( 1, Dict.empty )
 
 
 decorate : Expr -> ( Context, TypedExpr, Int )
