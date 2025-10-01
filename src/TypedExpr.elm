@@ -27,14 +27,14 @@ type alias Context =
 
 fromContext : Context -> String
 fromContext c =
-    "{"
-        ++ (if Dict.isEmpty c then
-                " "
-
-            else
-                Dict.foldr (\k v rec -> k ++ ":" ++ fromType v ++ ", " ++ rec) "" c
-           )
-        ++ "}"
+    let
+        res =
+            Dict.toList c
+                |> List.map (\(id, t) -> id ++ ":" ++ fromType t)
+                |> List.intersperse ", "
+                |> List.foldr (\x y -> x ++ y) ""
+    in
+    "{" ++ res ++ "}"
 
 
 exprContext : Expr -> ( Int, Context )
