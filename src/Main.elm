@@ -2,15 +2,16 @@ module Main exposing (..)
 
 import Browser
 import Expr exposing (Expr, fromExpr)
-import Html exposing (Html, button, div, h2, h3, text, textarea)
+import Html exposing (Html, button, div, h2, h4, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
-import LambdaParser exposing (parse, viewExpr, viewTypedExpr)
+import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
-import Restrictions exposing (Restrictions, Substitution, mgu, fromRestrictions)
+import Restrictions exposing (Restrictions, Substitution, fromRestrictions, mgu)
 import Type exposing (Type, fromType)
-import TypedExpr exposing (Context, TypedExpr, decorate, fromTypedExpr, infer)
-import TypedExpr exposing (fromContext)
+import TypedExpr exposing (Context, TypedExpr, decorate, fromContext, fromTypedExpr, infer)
+import Restrictions exposing (simplifySubstitution)
+import Html exposing (h4)
 
 
 
@@ -61,7 +62,7 @@ update msg model =
 expressionViewer : String -> String -> Html Msg
 expressionViewer title s =
     div []
-        [ h3 [] [ text title ]
+        [ h4 [] [ text title ]
         , div
             [ style "background" "#f9f9f9"
             , style "padding" "12px"
@@ -116,7 +117,7 @@ fullTrace s =
                                 , ctx = context
                                 , res = r
                                 , t = t
-                                , sus = sus
+                                , sus = simplifySubstitution sus
                                 }
                         )
                         (mgu r)
@@ -132,9 +133,8 @@ view model =
             else
                 b
 
-        -- aaa =
-        --     fullTrace model.content
-        
+        aaa =
+            fullTrace model.content
     in
     div [ style "max-width" "600px", style "margin" "40px auto", style "font-family" "sans-serif", style "font-size" "24px" ]
         [ h2 [] [ text "λ-Calculus parser" ]
@@ -180,6 +180,5 @@ view model =
                     , expressionViewer "Type:" (fromType t)
                     , expressionViewer "Context:" (fromContext ctx)
                     , expressionViewer "Restrictions:" (fromRestrictions res)
-                    -- , expressionViewer "Substitutions:" (fromRestrictions sus)
                     ]
         ]
