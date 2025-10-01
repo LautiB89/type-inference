@@ -1,12 +1,11 @@
 module UnificationTest exposing (suite)
 
-import Dict
 import Expect exposing (Expectation)
 import Expr exposing (Expr(..))
 import Restrictions exposing (Restrictions, mgu)
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))
-import TypedExpr exposing (TypedExpr(..), infer)
+import TypedExpr exposing (TypedExpr(..))
 
 
 suite : Test
@@ -38,14 +37,14 @@ examplesTest : Test
 examplesTest =
     describe "Examples test"
         [ test "Example 1" <|
-          \_ ->
-              expectMgu
-                  [ ( TAbs (TVar 1) (TAbs (TVar 2) (TVar 1))
-                    , TAbs (TVar 2) (TAbs (TAbs (TVar 1) TNat) (TVar 1))
-                    )
-                  ]
-                  []
-                  (Err "Occurs check")
+            \_ ->
+                expectMgu
+                    [ ( TAbs (TVar 1) (TAbs (TVar 2) (TVar 1))
+                      , TAbs (TVar 2) (TAbs (TAbs (TVar 1) TNat) (TVar 1))
+                      )
+                    ]
+                    []
+                    (Err "Occurs check")
         , test "Example 2" <|
             \_ ->
                 expectMgu
