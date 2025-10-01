@@ -11,6 +11,7 @@ module Restrictions exposing
     , union
     , simplifySubstitution
     , substitute
+    , fromSubstitution
     )
 
 import List
@@ -172,6 +173,16 @@ substitute : Substitution -> Type -> Type
 substitute s =
     foldType s TNat TBool TAbs
 
+fromSubstitution : Substitution -> Int -> String
+fromSubstitution s n =
+    let
+        res =
+            List.range 1 (n - 1)
+                |> List.map (\k -> fromType (TVar k) ++ ":=" ++ fromType (s k))
+                |> List.intersperse ", "
+                |> List.foldr (\s1 s2 -> s1 ++ s2) ""
+    in
+    "{" ++ res ++ "}"
 
 
 -- Show

@@ -106,10 +106,10 @@ absDecorateTest =
             \_ ->
                 Expect.equal
                     (decorate (Abs "x1" (Abs "x" (Var "x"))))
-                    ( Dict.empty, TEAbs "x1" (TVar 2) (TEAbs "x" (TVar 1) (TEVar "x")), 3 )
+                    ( Dict.empty, TEAbs "x1" (TVar 1) (TEAbs "x" (TVar 2) (TEVar "x")), 3 )
         , test "Nested abstractions with same bound var and free var" <|
             \_ ->
                 Expect.equal
                     (decorate (App (Var "x") (Abs "x1" (Abs "x2" (Var "x2")))))
-                    ( Dict.singleton "x" (TVar 1), TEApp (TEVar "x") (TEAbs "x1" (TVar 3) (TEAbs "x2" (TVar 2) (TEVar "x2"))), 4 )
+                    ( Dict.singleton "x" (TVar 1), TEApp (TEVar "x") (TEAbs "x1" (TVar 2) (TEAbs "x2" (TVar 3) (TEVar "x2"))), 4 )
         ]

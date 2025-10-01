@@ -1,15 +1,25 @@
 module Main exposing (..)
 
 import Browser
-import Expr exposing (Expr, fromExpr)
+import Dict
+import Expr exposing (Expr, foldrExpr, fromExpr)
 import Html exposing (Html, button, div, h2, h4, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
-import Restrictions exposing (Restrictions, Substitution, fromRestrictions, mgu, simplifySubstitution)
-import Type exposing (Type, fromType)
-import TypedExpr exposing (Context, TypedExpr, decorate, fromContext, fromTypedExpr, infer)
+import Restrictions
+    exposing
+        ( Restrictions
+        , Substitution
+        , fromRestrictions
+        , fromSubstitution
+        , mgu
+        , simplifySubstitution
+        , substitute
+        )
+import Type exposing (Type(..), fromType)
+import TypedExpr exposing (Context, TypedExpr(..), decorate, foldrTypedExpr, fromContext, fromTypedExpr, infer)
 
 
 
@@ -74,12 +84,14 @@ expressionViewer title s =
 
 type alias FullTrace =
     { str : String
+    , rectified : Expr
     , untyped : Expr
     , typed : TypedExpr
     , ctx : Context
     , res : Restrictions
     , t : Type
     , sus : Substitution
+    , nextFreshN : Int
     }
 
 
@@ -110,12 +122,14 @@ fullTrace s =
                         (\sus ->
                             Ok
                                 { str = s
+                                , rectified = rectified
                                 , untyped = expr
                                 , typed = typed
                                 , ctx = context
                                 , res = r
                                 , t = t
                                 , sus = simplifySubstitution sus
+                                , nextFreshN = n1
                                 }
                         )
                         (mgu r)
@@ -140,7 +154,7 @@ view model =
         , style "font-family" "sans-serif"
         , style "font-size" "24px"
         ]
-        [ h2 [] [ text "λ-Calculus parser" ]
+        [ h2 [] [ text "Algoritmo I" ]
         , textarea
             [ value model.content
             , onInput Change
@@ -163,7 +177,7 @@ view model =
                 , style "cursor" "pointer"
                 ]
                 [ text
-                    (ifShowParens "Hide" "Show" ++ " implicit parens")
+                    (ifShowParens "Mostrar" "Esconder" ++ " paréntesis implícitos")
                 ]
             ]
         , case aaa of
@@ -177,12 +191,84 @@ view model =
                     ]
                     [ text err ]
 
-            Ok { ctx, res, str, sus, t, typed, untyped } ->
+            Ok { ctx, rectified, res, sus, t, typed, untyped, nextFreshN } ->
                 div []
-                    [ expressionViewer "Untyped term:" (fromExpr model.showImplicitParens untyped)
-                    , expressionViewer "Typed term:" (fromTypedExpr model.showImplicitParens typed)
-                    , expressionViewer "Type:" (fromType t)
-                    , expressionViewer "Context:" (fromContext ctx)
-                    , expressionViewer "Restrictions:" (fromRestrictions res)
+                    [ expressionViewer "0. Término sin tipo" (fromExpr model.showImplicitParens untyped)
+                    , expressionViewer "1. Rectificación" (fromExpr model.showImplicitParens rectified)
+                    , div []
+                        [ h4 [] [ text "2. Anotación" ]
+                        , div
+                            [ style "background" "#f9f9f9"
+                            , style "padding" "12px"
+                            , style "border-radius" "4px"
+                            , style "min-height" "40px"
+                            , style "font-family" "monospace"
+                            , style "display" "flex"
+                            , style "flex-direction" "column"
+                            ]
+                            [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens typed) ]
+                            , div [] [ text ("Γ0: " ++ fromContext ctx) ]
+                            ]
+                        ]
+                    , div []
+                        [ h4 [] [ text "3. Generación de restricciones" ]
+                        , div
+                            [ style "background" "#f9f9f9"
+                            , style "padding" "12px"
+                            , style "border-radius" "4px"
+                            , style "min-height" "40px"
+                            , style "font-family" "monospace"
+                            , style "display" "flex"
+                            , style "flex-direction" "column"
+                            ]
+                            [ div [] [ text ("Tipo: " ++ fromType t) ]
+                            , div [] [ text ("Restricciones: " ++ fromRestrictions res) ]
+                            ]
+                        ]
+                    , div []
+                        [ h4 [] [ text "4. Unificación" ]
+                        , div
+                            [ style "background" "#f9f9f9"
+                            , style "padding" "12px"
+                            , style "border-radius" "4px"
+                            , style "min-height" "40px"
+                            , style "font-family" "monospace"
+                            , style "display" "flex"
+                            , style "flex-direction" "column"
+                            ]
+                            [ div [] [ text ("Sustitución: " ++ fromSubstitution sus nextFreshN) ]
+                            ]
+                        ]
+                    , div []
+                        [ h4 [] [ text "Resultado" ]
+                        , div
+                            [ style "background" "#f9f9f9"
+                            , style "padding" "12px"
+                            , style "border-radius" "4px"
+                            , style "min-height" "40px"
+                            , style "font-family" "monospace"
+                            , style "display" "flex"
+                            , style "flex-direction" "column"
+                            ]
+                            [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute sus t1) ctx)) ]
+                            , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr sus typed)) ]
+                            , div [] [ text ("Tipo: " ++ fromType (substitute sus t)) ]
+                            ]
+                        ]
                     ]
         ]
+
+
+substituteExpr : Substitution -> TypedExpr -> TypedExpr
+substituteExpr s =
+    foldrTypedExpr
+        TEVar
+        (\id t rec -> TEAbs id (substitute s t) rec)
+        TEApp
+        TEConstTrue
+        TEConstFalse
+        TEIsZero
+        TEConstZero
+        TESucc
+        TEPred
+        TEIf
