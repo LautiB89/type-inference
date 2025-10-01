@@ -1,4 +1,5 @@
 module Expr exposing (..)
+import Utils exposing (maybeParens)
 
 type alias Id =
     String
@@ -140,14 +141,6 @@ fromExpr showImplicitParens =
                 ++ rec3
         )
 
-
-maybeParens : String -> Bool -> String
-maybeParens s b =
-    if b then
-        "(" ++ s ++ ")"
-
-    else
-        s
 
 isApp : Expr -> Bool
 isApp expr =

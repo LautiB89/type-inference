@@ -1,4 +1,4 @@
-module Utils exposing (until)
+module Utils exposing (until, maybeParens)
 
 until : (a -> Bool) -> (a -> a) -> a -> a
 until p f z =
@@ -7,3 +7,11 @@ until p f z =
 
     else
         until p f (f z)
+
+maybeParens : String -> Bool -> String
+maybeParens s b =
+    if b then
+        "(" ++ s ++ ")"
+
+    else
+        s
