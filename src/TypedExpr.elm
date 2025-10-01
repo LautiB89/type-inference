@@ -1,15 +1,11 @@
 module TypedExpr exposing (..)
 
 import Dict exposing (Dict)
-import Set exposing (Set)
 import Expr exposing (Expr(..), Id)
 import NaiveRectify exposing (freeExprVars)
-import String exposing (fromInt)
-type Type
-    = TVar Int
-    | TNat
-    | TBool
-    | TAbs Type Type
+import Restrictions exposing (Restrictions)
+import Set
+import Type exposing (Type(..), fromType)
 
 
 type TypedExpr
@@ -28,72 +24,102 @@ type TypedExpr
 type alias Context =
     Dict Id Type
 
+
+fromContext : Context -> String
+fromContext c =
+    "{"
+        ++ (if Dict.isEmpty c then
+                " "
+
+            else
+                Dict.foldr (\k v rec -> k ++ ":" ++ fromType v ++ ", " ++ rec) "" c
+           )
+        ++ "}"
+
+
 exprContext : Expr -> ( Int, Context )
 exprContext expr =
     freeExprVars expr
         |> Set.foldr (\x ( n, d ) -> ( n + 1, Dict.insert x (TVar n) d )) ( 1, Dict.empty )
 
 
-decorate : Expr -> ( Context, TypedExpr )
+decorate : Expr -> ( Context, TypedExpr, Int )
 decorate expr =
     let
         ( n, context ) =
             exprContext expr
-    in
-    (context, Tuple.first (decorateHelper expr n) )
 
+        ( typedExpr, n1 ) =
+            decorateHelper expr n
+    in
+    ( context, typedExpr, n1 )
 
 
 decorateHelper : Expr -> Int -> ( TypedExpr, Int )
-decorateHelper expr n = case expr of
-    Var id -> (TEVar id, n)
-    Abs id e -> 
-        let
-            (rec, n2) = decorateHelper e n
-        in
-        (TEAbs id (TVar n2) rec, n2 + 1)
-        
-    App e1 e2 ->
-        let 
-            (rec1, n1) = decorateHelper e1 n
-        
-            (rec2, n2) = decorateHelper e2 n1
-        in
-            (TEApp rec1 rec2, n2)
+decorateHelper expr n =
+    case expr of
+        Var id ->
+            ( TEVar id, n )
 
-    ConstTrue -> (TEConstTrue, n)
-    ConstFalse -> (TEConstFalse, n)
+        Abs id e ->
+            let
+                ( rec, n2 ) =
+                    decorateHelper e n
+            in
+            ( TEAbs id (TVar n2) rec, n2 + 1 )
 
-    IsZero e ->
-        let
-            (rec, n1) = decorateHelper e n
-        in
-            (TEIsZero rec, n1)
+        App e1 e2 ->
+            let
+                ( rec1, n1 ) =
+                    decorateHelper e1 n
 
-    ConstZero -> (TEConstZero, n)
+                ( rec2, n2 ) =
+                    decorateHelper e2 n1
+            in
+            ( TEApp rec1 rec2, n2 )
 
-    Succ e ->
-        let
-            (rec, n1) = decorateHelper e n
-        in
-            (TESucc rec, n1)
+        ConstTrue ->
+            ( TEConstTrue, n )
 
-    Pred e ->
-        let
-            (rec, n1) = decorateHelper e n
-        in
-            (TEPred rec, n1)
+        ConstFalse ->
+            ( TEConstFalse, n )
 
+        IsZero e ->
+            let
+                ( rec, n1 ) =
+                    decorateHelper e n
+            in
+            ( TEIsZero rec, n1 )
 
-    If e1 e2 e3 ->
-        let 
-            (rec1, n1) = decorateHelper e1 n
-        
-            (rec2, n2) = decorateHelper e2 n1
-            (rec3, n3) = decorateHelper e3 n2
-        in
-            (TEIf rec1 rec2 rec3, n3)
+        ConstZero ->
+            ( TEConstZero, n )
 
+        Succ e ->
+            let
+                ( rec, n1 ) =
+                    decorateHelper e n
+            in
+            ( TESucc rec, n1 )
+
+        Pred e ->
+            let
+                ( rec, n1 ) =
+                    decorateHelper e n
+            in
+            ( TEPred rec, n1 )
+
+        If e1 e2 e3 ->
+            let
+                ( rec1, n1 ) =
+                    decorateHelper e1 n
+
+                ( rec2, n2 ) =
+                    decorateHelper e2 n1
+
+                ( rec3, n3 ) =
+                    decorateHelper e3 n2
+            in
+            ( TEIf rec1 rec2 rec3, n3 )
 
 
 foldrTypedExpr :
@@ -219,12 +245,6 @@ fromTypedExpr showImplicitParens =
                 ++ rec3
         )
 
-fromType : Type -> String
-fromType t = case t of
-    TVar n -> "X" ++ fromInt n 
-    TNat -> "Nat" 
-    TBool -> "Bool"
-    TAbs t1 t2 -> (fromType t1) ++ " -> " ++ (fromType t2) 
 
 maybeParens : String -> Bool -> String
 maybeParens s b =
@@ -233,6 +253,7 @@ maybeParens s b =
 
     else
         s
+
 
 isApp : TypedExpr -> Bool
 isApp expr =
@@ -244,86 +265,81 @@ isApp expr =
             False
 
 
-type Restriction
-    = Unifies Type Type
-
-infer : TypedExpr -> Context -> Int -> (Maybe Type, Set Restriction, Int)
+infer : TypedExpr -> Context -> Int -> Maybe ( Type, Restrictions, Int )
 infer e context n =
     case e of
         TEVar id ->
-            (Dict.get id context, Set.empty, n)
-                
+            Dict.get id context
+                |> Maybe.map (\t -> ( t, Restrictions.empty, n ))
+
         TEAbs id varType expr ->
-            let
-                (mt, r1, n1) = infer expr (Dict.insert id varType context) n
-            in
-                (Maybe.map (\bodyType -> TAbs varType bodyType) mt, r1, n1)
+            infer expr (Dict.insert id varType context) n
+                |> Maybe.map
+                    (\( bodyType, r1, n1 ) ->
+                        ( TAbs varType bodyType, r1, n1 )
+                    )
+
         TEApp e1 e2 ->
-            let
-                (me1, r1, n1) = infer e1 context n
-                (me2, r2, n2) = infer e2 context n1
-                n3 = n2 + 1
-                freshVar = TVar n2
-                
-            in
-                Maybe.map2 
-                    (\type1 type2 -> 
-                        ( freshVar
-                        , Set.insert (Unifies type1 (TAbs type2 freshVar)) (Set.union r1 r2)
-                        , n3
-                        )
-                    )
-                    me1 
-                    me2
-        TEConstTrue -> (TBool, Set.empty, n)
-        TEConstFalse -> (TBool, Set.empty, n)
-        IsZero e1 -> 
-            let
-                (mt, r1, n1) = infer e1 context n
-            in
-                Maybe.map 
-                    (\bodyType -> 
-                        (TBool, Set.insert (Unifies bodyType TNat) r1, n1)
-                    )
-                    mt
-        ConstZero -> (TNat, Set.empty, n)
+            Maybe.andThen
+                (\( t1, r1, n1 ) ->
+                    infer e2 context n1
+                        |> Maybe.map
+                            (\( t2, r2, n2 ) ->
+                                ( TVar n2
+                                , Restrictions.insert ( t1, TAbs t2 (TVar n2) ) (Restrictions.union r1 r2)
+                                , n2 + 1
+                                )
+                            )
+                )
+                (infer e1 context n)
 
-        Succ e1 ->
-            let
-                (mt, r1, n1) = infer e1 context n
-            in
-                Maybe.map 
-                    (\bodyType -> 
-                        (TNat, Set.insert (Unifies bodyType TNat) r1, n1)
-                    )
-                    mt
-        Pred e1 ->
-            let
-                (mt, r1, n1) = infer e1 context n
-            in
-                Maybe.map 
-                    (\bodyType -> 
-                        (TNat, Set.insert (Unifies bodyType TNat) r1, n1)
-                    )
-                    mt
+        TEConstTrue ->
+            Just ( TBool, Restrictions.empty, n )
 
-        TEIf e1 e2 e3 -> 
-            let
-                (me1, r1, n1) = infer e1 context n
-                (me2, r2, n2) = infer e2 context n1
-                (me3, r3, n3) = infer e3 context n2
-                
-            in
-                Maybe.map3 
-                    (\type1 type2 type3 -> 
-                        ( type2
-                        , Set.union r1 r2
-                            |> Set.union r3
-                            |> Set.insert (Unifies type1 TBool) 
-                            |> Set.insert (Unifies type2 type3) 
-                        , n3
-                        )
+        TEConstFalse ->
+            Just ( TBool, Restrictions.empty, n )
+
+        TEIsZero e1 ->
+            infer e1 context n
+                |> Maybe.map
+                    (\( t1, r1, n1 ) ->
+                        ( TBool, Restrictions.insert ( t1, TNat ) r1, n1 )
                     )
-                    me1 
-                    me2
-                    me3
+
+        TEConstZero ->
+            Just ( TNat, Restrictions.empty, n )
+
+        TESucc e1 ->
+            infer e1 context n
+                |> Maybe.map
+                    (\( t1, r1, n1 ) ->
+                        ( TNat, Restrictions.insert ( t1, TNat ) r1, n1 )
+                    )
+
+        TEPred e1 ->
+            infer e1 context n
+                |> Maybe.map
+                    (\( t1, r1, n1 ) ->
+                        ( TNat, Restrictions.insert ( t1, TNat ) r1, n1 )
+                    )
+
+        TEIf e1 e2 e3 ->
+            infer e1 context n
+                |> Maybe.andThen
+                    (\( t1, r1, n1 ) ->
+                        infer e2 context n1
+                            |> Maybe.andThen
+                                (\( t2, r2, n2 ) ->
+                                    infer e3 context n2
+                                        |> Maybe.map
+                                            (\( t3, r3, n3 ) ->
+                                                ( t2
+                                                , Restrictions.union r1 r2
+                                                    |> Restrictions.union r3
+                                                    |> Restrictions.insert ( t1, TBool )
+                                                    |> Restrictions.insert ( t2, t3 )
+                                                , n3
+                                                )
+                                            )
+                                )
+                    )

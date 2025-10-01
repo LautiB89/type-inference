@@ -1,12 +1,16 @@
 module Main exposing (..)
 
 import Browser
+import Expr exposing (Expr, fromExpr)
 import Html exposing (Html, button, div, h2, h3, text, textarea)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import LambdaParser exposing (parse, viewExpr, viewTypedExpr)
 import MinRectify exposing (minRectify)
-import TypedExpr exposing (decorate)
+import Restrictions exposing (Restrictions, Substitution, mgu, fromRestrictions)
+import Type exposing (Type, fromType)
+import TypedExpr exposing (Context, TypedExpr, decorate, fromTypedExpr, infer)
+import TypedExpr exposing (fromContext)
 
 
 
@@ -54,6 +58,70 @@ update msg model =
 -- VIEW
 
 
+expressionViewer : String -> String -> Html Msg
+expressionViewer title s =
+    div []
+        [ h3 [] [ text title ]
+        , div
+            [ style "background" "#f9f9f9"
+            , style "padding" "12px"
+            , style "border-radius" "4px"
+            , style "min-height" "40px"
+            , style "font-family" "monospace"
+            ]
+            [ text s ]
+        ]
+
+
+type alias FullTrace =
+    { str : String
+    , untyped : Expr
+    , typed : TypedExpr
+    , ctx : Context
+    , res : Restrictions
+    , t : Type
+    , sus : Substitution
+    }
+
+
+fullTrace : String -> Result String FullTrace
+fullTrace s =
+    case parse s of
+        Err _ ->
+            Err "err"
+
+        Ok expr ->
+            let
+                rectified : Expr
+                rectified =
+                    minRectify expr
+
+                ( context, typed, n1 ) =
+                    decorate rectified
+
+                may =
+                    infer typed context n1
+            in
+            case may of
+                Nothing ->
+                    Err ""
+
+                Just ( t, r, _ ) ->
+                    Result.andThen
+                        (\sus ->
+                            Ok
+                                { str = s
+                                , untyped = expr
+                                , typed = typed
+                                , ctx = context
+                                , res = r
+                                , t = t
+                                , sus = sus
+                                }
+                        )
+                        (mgu r)
+
+
 view : Model -> Html Msg
 view model =
     let
@@ -63,6 +131,10 @@ view model =
 
             else
                 b
+
+        -- aaa =
+        --     fullTrace model.content
+        
     in
     div [ style "max-width" "600px", style "margin" "40px auto", style "font-family" "sans-serif", style "font-size" "24px" ]
         [ h2 [] [ text "λ-Calculus parser" ]
@@ -90,31 +162,24 @@ view model =
                     (ifShowParens "Hide" "Show" ++ " implicit parens")
                 ]
             ]
-        , h3 [] [ text "Parsed output:" ]
-        , div
-            [ style "background" "#f9f9f9"
-            , style "padding" "12px"
-            , style "border-radius" "4px"
-            , style "min-height" "40px"
-            , style "font-family" "monospace"
-            ]
-            [ text (viewExpr model.showImplicitParens (parse model.content)) ]
-        , h3 [] [ text "Rectified output:" ]
-        , div
-            [ style "background" "#f9f9f9"
-            , style "padding" "12px"
-            , style "border-radius" "4px"
-            , style "min-height" "40px"
-            , style "font-family" "monospace"
-            ]
-            [ text (viewExpr model.showImplicitParens (Result.map minRectify (parse model.content))) ]
-        , h3 [] [ text "Anotated output:" ]
-        , div
-            [ style "background" "#f9f9f9"
-            , style "padding" "12px"
-            , style "border-radius" "4px"
-            , style "min-height" "40px"
-            , style "font-family" "monospace"
-            ]
-            [ text (viewTypedExpr model.showImplicitParens (Result.map (\te -> Tuple.second (decorate (minRectify te))) (parse model.content))) ]
+        , case aaa of
+            Err err ->
+                div
+                    [ style "background" "#f9f9f9"
+                    , style "padding" "12px"
+                    , style "border-radius" "4px"
+                    , style "min-height" "40px"
+                    , style "font-family" "monospace"
+                    ]
+                    [ text err ]
+
+            Ok { ctx, res, str, sus, t, typed, untyped } ->
+                div []
+                    [ expressionViewer "Untyped term:" (fromExpr model.showImplicitParens untyped)
+                    , expressionViewer "Typed term:" (fromTypedExpr model.showImplicitParens typed)
+                    , expressionViewer "Type:" (fromType t)
+                    , expressionViewer "Context:" (fromContext ctx)
+                    , expressionViewer "Restrictions:" (fromRestrictions res)
+                    -- , expressionViewer "Substitutions:" (fromRestrictions sus)
+                    ]
         ]
