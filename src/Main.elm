@@ -10,8 +10,10 @@ import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
 import Restrictions
     exposing
-        ( Restrictions
+        ( MguError(..)
+        , Restrictions
         , Substitution
+        , fromMguError
         , fromRestrictions
         , fromSubstitution
         , mgu
@@ -19,7 +21,16 @@ import Restrictions
         , substitute
         )
 import Type exposing (Type(..), fromType)
-import TypedExpr exposing (Context, TypedExpr(..), decorate, foldrTypedExpr, fromContext, fromTypedExpr, infer)
+import TypedExpr
+    exposing
+        ( Context
+        , TypedExpr(..)
+        , decorate
+        , foldrTypedExpr
+        , fromContext
+        , fromTypedExpr
+        , infer
+        )
 
 
 
@@ -97,11 +108,31 @@ type alias FullTrace =
     }
 
 
-fullTrace : String -> Result String FullTrace
+type AlgoIError
+    = ParsingError
+    | UnexpectedInferError
+    | MguErr MguError
+
+
+showAlgoIError : AlgoIError -> String
+showAlgoIError err =
+    case err of
+        ParsingError ->
+            "Error de parsing"
+
+        UnexpectedInferError ->
+            "Error inesperado durante la inferencia"
+
+        MguErr mguErr ->
+            "MGU falló: " ++ fromMguError mguErr
+
+
+
+fullTrace : String -> Result AlgoIError FullTrace
 fullTrace s =
     case parse s of
         Err _ ->
-            Err "err"
+            Err ParsingError
 
         Ok expr ->
             let
@@ -112,29 +143,31 @@ fullTrace s =
                 ( context, typed, n1 ) =
                     decorate rectified
 
-                may =
-                    infer typed context n1
+                ( may, _ ) =
+                    infer context typed n1
             in
             case may of
                 Nothing ->
-                    Err ""
+                    Err UnexpectedInferError
 
-                Just ( t, r, _ ) ->
-                    Result.andThen
-                        (\sus ->
-                            Ok
-                                { str = s
-                                , rectified = rectified
-                                , untyped = expr
-                                , typed = typed
-                                , ctx = context
-                                , res = r
-                                , t = t
-                                , sus = simplifySubstitution sus
-                                , nextFreshN = n1
-                                }
+                Just ( t, r ) ->
+                    Result.mapError MguErr
+                        (Result.andThen
+                            (\sus ->
+                                Ok
+                                    { str = s
+                                    , rectified = rectified
+                                    , untyped = expr
+                                    , typed = typed
+                                    , ctx = context
+                                    , res = r
+                                    , t = t
+                                    , sus = simplifySubstitution sus
+                                    , nextFreshN = n1
+                                    }
+                            )
+                            (mgu r)
                         )
-                        (mgu r)
 
 
 view : Model -> Html Msg
@@ -184,7 +217,7 @@ view model =
             ]
         , case aaa of
             Err err ->
-                stepDiv "Ocurrió un error" [ text err ]
+                stepDiv "Ocurrió un error" [ text (showAlgoIError err) ]
 
             Ok { ctx, rectified, res, sus, t, typed, untyped, nextFreshN } ->
                 div []

@@ -6,7 +6,7 @@ import NaiveRectify exposing (freeExprVars)
 import Restrictions exposing (Restrictions)
 import Set
 import Type exposing (Type(..), fromType)
-import Utils exposing (maybeParens)
+import Utils exposing (lift, lift3, maybeParens)
 
 
 type TypedExpr
@@ -270,81 +270,94 @@ isIf expr =
             False
 
 
-infer : TypedExpr -> Context -> Int -> Maybe ( Type, Restrictions, Int )
-infer e context n =
+infer : Context -> TypedExpr -> Int -> ( Maybe ( Type, Restrictions ), Int )
+infer context e n =
     case e of
         TEVar id ->
-            Dict.get id context
-                |> Maybe.map (\t -> ( t, Restrictions.empty, n ))
+            ( Maybe.map
+                (\t -> ( t, Restrictions.empty ))
+                (Dict.get id context)
+            , n
+            )
 
-        TEAbs id varType expr ->
-            infer expr (Dict.insert id varType context) n
-                |> Maybe.map
-                    (\( bodyType, r1, n1 ) ->
-                        ( TAbs varType bodyType, r1, n1 )
-                    )
+        TEAbs id varType e1 ->
+            lift
+                (infer (Dict.insert id varType context))
+                (\( bodyType, r1 ) ->
+                    ( TAbs varType bodyType, r1 )
+                )
+                e1
+                n
 
         TEApp e1 e2 ->
-            Maybe.andThen
-                (\( t1, r1, n1 ) ->
-                    infer e2 context n1
-                        |> Maybe.map
-                            (\( t2, r2, n2 ) ->
+            let
+                ( rec1, n1 ) =
+                    infer context e1 n
+
+                ( rec2, n2 ) =
+                    infer context e2 n1
+
+                res =
+                    Maybe.map2
+                        (\( type1, rest1 ) ->
+                            \( type2, rest2 ) ->
                                 ( TVar n2
-                                , Restrictions.insert ( t1, TAbs t2 (TVar n2) ) (Restrictions.union r1 r2)
-                                , n2 + 1
+                                , Restrictions.insert
+                                    ( type1, TAbs type2 (TVar n2) )
+                                    (Restrictions.union rest1 rest2)
                                 )
-                            )
-                )
-                (infer e1 context n)
+                        )
+                        rec1
+                        rec2
+            in
+            ( res, n2 + 1 )
 
         TEConstTrue ->
-            Just ( TBool, Restrictions.empty, n )
+            ( Just ( TBool, Restrictions.empty ), n )
 
         TEConstFalse ->
-            Just ( TBool, Restrictions.empty, n )
+            ( Just ( TBool, Restrictions.empty ), n )
 
         TEIsZero e1 ->
-            infer e1 context n
-                |> Maybe.map
-                    (\( t1, r1, n1 ) ->
-                        ( TBool, Restrictions.insert ( t1, TNat ) r1, n1 )
-                    )
+            lift (infer context)
+                (\( type1, rest1 ) ->
+                    ( TBool, Restrictions.insert ( type1, TNat ) rest1 )
+                )
+                e1
+                n
 
         TEConstZero ->
-            Just ( TNat, Restrictions.empty, n )
+            ( Just ( TNat, Restrictions.empty ), n )
 
         TESucc e1 ->
-            infer e1 context n
-                |> Maybe.map
-                    (\( t1, r1, n1 ) ->
-                        ( TNat, Restrictions.insert ( t1, TNat ) r1, n1 )
-                    )
+            lift (infer context)
+                (\( type1, rest1 ) ->
+                    ( TNat, Restrictions.insert ( type1, TNat ) rest1 )
+                )
+                e1
+                n
 
         TEPred e1 ->
-            infer e1 context n
-                |> Maybe.map
-                    (\( t1, r1, n1 ) ->
-                        ( TNat, Restrictions.insert ( t1, TNat ) r1, n1 )
-                    )
+            lift
+                (infer context)
+                (\( type1, rest1 ) ->
+                    ( TNat, Restrictions.insert ( type1, TNat ) rest1 )
+                )
+                e1
+                n
 
         TEIf e1 e2 e3 ->
-            infer e1 context n
-                |> Maybe.andThen
-                    (\( t1, r1, n1 ) ->
-                        infer e2 context n1
-                            |> Maybe.andThen
-                                (\( t2, r2, n2 ) ->
-                                    infer e3 context n2
-                                        |> Maybe.map
-                                            (\( t3, r3, n3 ) ->
-                                                ( t2
-                                                , Restrictions.union r1 r2
-                                                    |> Restrictions.union r3
-                                                    |> Restrictions.insert ( t1, TBool )
-                                                    |> Restrictions.insert ( t2, t3 )
-                                                , n3
-                                                )
-                                            )
-                                )
+            lift3
+                (infer context)
+                (\( type1, rest1 ) ( type2, rest2 ) ( type3, rest3 ) ->
+                    ( type2
+                    , Restrictions.union rest1 rest2
+                        |> Restrictions.union rest3
+                        |> Restrictions.insert ( type1, TBool )
+                        |> Restrictions.insert ( type2, type3 )
                     )
+                )
+                e1
+                e2
+                e3
+                n

@@ -1,17 +1,19 @@
 module Restrictions exposing
-    ( Restrictions
+    ( MguError(..)
+    , Restrictions
     , Substitution
     , empty
+    , fromMguError
     , fromRestrictions
+    , fromSubstitution
     , insert
     , member
     , mgu
     , remove
-    , singleton
-    , union
     , simplifySubstitution
+    , singleton
     , substitute
-    , fromSubstitution
+    , union
     )
 
 import List
@@ -68,7 +70,26 @@ type alias Substitution =
     Int -> Type
 
 
-mgu : Restrictions -> Result String Substitution
+type MguError
+    = Clash Type Type
+    | OccursCheck Type Type
+
+
+fromMguError : MguError -> String
+fromMguError mguErr =
+    let
+        errorMessage t1 t2 =
+            fromType t1 ++ " y " ++ fromType t2
+    in
+    case mguErr of
+        Clash t1 t2 ->
+            "Clash/Colisión entre " ++ errorMessage t1 t2
+
+        OccursCheck t1 t2 ->
+            "OccursCheck entre " ++ errorMessage t1 t2
+
+
+mgu : Restrictions -> Result MguError Substitution
 mgu ys =
     case ys of
         [] ->
@@ -85,7 +106,7 @@ mgu ys =
                             mgu (insert ( s2, s1 ) xs)
 
                         _ ->
-                            Err "Clash"
+                            Err (Clash s1 s2)
 
                 TBool ->
                     case s2 of
@@ -96,7 +117,7 @@ mgu ys =
                             mgu (insert ( s2, s1 ) xs)
 
                         _ ->
-                            Err "Clash"
+                            Err (Clash s1 s2)
 
                 TNat ->
                     case s2 of
@@ -107,7 +128,7 @@ mgu ys =
                             mgu (insert ( s2, s1 ) xs)
 
                         _ ->
-                            Err "Clash"
+                            Err (Clash s1 s2)
 
                 TVar n ->
                     case s2 of
@@ -129,7 +150,7 @@ mgu ys =
 
                         _ ->
                             if hasVar n s2 then
-                                Err "Occurs check"
+                                Err (OccursCheck s1 s2)
 
                             else
                                 mgu (List.map (Tuple.mapBoth (replaceVar n s2) (replaceVar n s2)) xs)
@@ -173,6 +194,7 @@ substitute : Substitution -> Type -> Type
 substitute s =
     foldType s TNat TBool TAbs
 
+
 fromSubstitution : Substitution -> Int -> String
 fromSubstitution s n =
     let
@@ -183,6 +205,7 @@ fromSubstitution s n =
                 |> List.foldr (\s1 s2 -> s1 ++ s2) ""
     in
     "{" ++ res ++ "}"
+
 
 
 -- Show

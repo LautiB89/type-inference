@@ -2,7 +2,7 @@ module UnificationTest exposing (suite)
 
 import Expect exposing (Expectation)
 import Expr exposing (Expr(..))
-import Restrictions exposing (Restrictions, mgu)
+import Restrictions exposing (MguError(..), Restrictions, mgu)
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))
 import TypedExpr exposing (TypedExpr(..))
@@ -44,7 +44,7 @@ examplesTest =
                       )
                     ]
                     []
-                    (Err "Occurs check")
+                    (Err (OccursCheck (TVar 2) (TAbs (TVar 2) TNat)))
         , test "Example 2" <|
             \_ ->
                 expectMgu
@@ -71,25 +71,25 @@ clashTest =
                 expectMgu
                     [ ( TNat, TBool ) ]
                     []
-                    (Err "Clash")
+                    (Err (Clash TNat TBool))
         , test "Bool with Nat" <|
             \_ ->
                 expectMgu
                     [ ( TBool, TNat ) ]
                     []
-                    (Err "Clash")
+                    (Err (Clash TBool TNat))
         , test "Abs with Bool" <|
             \_ ->
                 expectMgu
                     [ ( TAbs TBool TBool, TBool ) ]
                     []
-                    (Err "Clash")
+                    (Err (Clash (TAbs TBool TBool) TBool))
         , test "Abs with Nat" <|
             \_ ->
                 expectMgu
                     [ ( TAbs TBool TBool, TNat ) ]
                     []
-                    (Err "Clash")
+                    (Err (Clash (TAbs TBool TBool) TNat))
         ]
 
 
@@ -101,31 +101,31 @@ occursCheckTest =
                 expectMgu
                     [ ( TVar 1, TAbs (TVar 1) TBool ) ]
                     []
-                    (Err "Occurs check")
+                    (Err (OccursCheck (TVar 1) (TAbs (TVar 1) TBool)))
         , test "1 level occurs check right" <|
             \_ ->
                 expectMgu
                     [ ( TVar 1, TAbs TBool (TVar 1) ) ]
                     []
-                    (Err "Occurs check")
+                    (Err (OccursCheck (TVar 1) (TAbs TBool (TVar 1))))
         , test "1 level occurs check right and left" <|
             \_ ->
                 expectMgu
                     [ ( TVar 1, TAbs (TVar 1) (TVar 1) ) ]
                     []
-                    (Err "Occurs check")
+                    (Err (OccursCheck (TVar 1) (TAbs (TVar 1) (TVar 1))))
         , test "2 levels occurs check left" <|
             \_ ->
                 expectMgu
                     [ ( TVar 1, TAbs (TAbs TNat (TVar 1)) TBool ) ]
                     []
-                    (Err "Occurs check")
+                    (Err (OccursCheck (TVar 1) (TAbs (TAbs TNat (TVar 1)) TBool)))
         , test "2 levels occurs check right" <|
             \_ ->
                 expectMgu
                     [ ( TVar 1, TAbs TBool (TAbs (TVar 1) TNat) ) ]
                     []
-                    (Err "Occurs check")
+                    (Err (OccursCheck (TVar 1) (TAbs TBool (TAbs (TVar 1) TNat))))
         ]
 
 
@@ -141,7 +141,7 @@ deleteTest =
         ]
 
 
-expectMgu : Restrictions -> List Int -> Result String (List ( Int, Type )) -> Expectation
+expectMgu : Restrictions -> List Int -> Result MguError (List ( Int, Type )) -> Expectation
 expectMgu restrictions varDom expectedRes =
     let
         resSust =
