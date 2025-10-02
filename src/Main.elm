@@ -39,7 +39,11 @@ import TypedExpr
 
 main : Program () Model Msg
 main =
-    Browser.sandbox { init = init, update = update, view = view }
+    Browser.sandbox
+        { init = init
+        , update = update
+        , view = view
+        }
 
 
 
@@ -47,7 +51,9 @@ main =
 
 
 type alias Model =
-    { content : String, showImplicitParens : Bool }
+    { content : String
+    , showImplicitParens : Bool
+    }
 
 
 init : Model
@@ -96,14 +102,14 @@ stepDiv title xs =
 
 
 type alias FullTrace =
-    { str : String
-    , rectified : Expr
-    , untyped : Expr
-    , typed : TypedExpr
-    , ctx : Context
-    , res : Restrictions
-    , t : Type
-    , sus : Substitution
+    { inputStr : String
+    , rectExpr : Expr
+    , plainExpr : Expr
+    , typedExpr : TypedExpr
+    , context : Context
+    , restrictions : Restrictions
+    , exprType : Type
+    , substitution : Substitution
     , nextFreshN : Int
     }
 
@@ -133,11 +139,11 @@ fullTrace s =
         Err _ ->
             Err ParsingError
 
-        Ok expr ->
+        Ok parsedExpr ->
             let
                 rectified : Expr
                 rectified =
-                    minRectify expr
+                    minRectify parsedExpr
 
                 ( context, typed, n1 ) =
                     decorate rectified
@@ -149,22 +155,22 @@ fullTrace s =
                 Nothing ->
                     Err UnexpectedInferError
 
-                Just ( t, r ) ->
+                Just ( exprType, restrictions ) ->
                     Result.mapError MguErr
                         (Result.map
                             (\sus ->
-                                { str = s
-                                , rectified = rectified
-                                , untyped = expr
-                                , typed = typed
-                                , ctx = context
-                                , res = r
-                                , t = t
-                                , sus = simplifySubstitution sus
+                                { inputStr = s
+                                , rectExpr = rectified
+                                , plainExpr = parsedExpr
+                                , typedExpr = typed
+                                , context = context
+                                , restrictions = restrictions
+                                , exprType = exprType
+                                , substitution = simplifySubstitution sus
                                 , nextFreshN = n1
                                 }
                             )
-                            (mgu r)
+                            (mgu restrictions)
                         )
 
 
@@ -217,24 +223,24 @@ view model =
             Err err ->
                 stepDiv "Ocurrió un error" [ text (showAlgoIError err) ]
 
-            Ok { ctx, rectified, res, sus, t, typed, untyped, nextFreshN } ->
+            Ok { context, rectExpr, restrictions, substitution, exprType, typedExpr, plainExpr, nextFreshN } ->
                 div []
-                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens untyped) ]
-                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens rectified) ]
+                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens plainExpr) ]
+                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens rectExpr) ]
                     , stepDiv "2. Anotación"
-                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens typed) ]
-                        , div [] [ text ("Γ0: " ++ fromContext ctx) ]
+                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens typedExpr) ]
+                        , div [] [ text ("Γ0: " ++ fromContext context) ]
                         ]
                     , stepDiv "3. Generación de restricciones"
-                        [ div [] [ text ("Tipo: " ++ fromType t) ]
-                        , div [] [ text ("Restricciones: " ++ fromRestrictions res) ]
+                        [ div [] [ text ("Tipo: " ++ fromType exprType) ]
+                        , div [] [ text ("Restricciones: " ++ fromRestrictions restrictions) ]
                         ]
                     , stepDiv "4. Unificación"
-                        [ div [] [ text ("Sustitución: " ++ fromSubstitution sus nextFreshN) ] ]
+                        [ div [] [ text ("Sustitución: " ++ fromSubstitution substitution nextFreshN) ] ]
                     , stepDiv "Resultado"
-                        [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute sus t1) ctx)) ]
-                        , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr sus typed)) ]
-                        , div [] [ text ("Tipo: " ++ fromType (substitute sus t)) ]
+                        [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute substitution t1) context)) ]
+                        , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr substitution typedExpr)) ]
+                        , div [] [ text ("Tipo: " ++ fromType (substitute substitution exprType)) ]
                         ]
                     ]
         ]
@@ -244,7 +250,7 @@ substituteExpr : Substitution -> TypedExpr -> TypedExpr
 substituteExpr s =
     foldrTypedExpr
         TEVar
-        (\id t rec -> TEAbs id (substitute s t) rec)
+        (\id t -> TEAbs id (substitute s t))
         TEApp
         TEConstTrue
         TEConstFalse

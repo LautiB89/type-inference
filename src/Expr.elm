@@ -123,7 +123,7 @@ recrExpr fVar fAbs fApp fTrue fFalse fIsZero fZero fSucc fPred fIf expr =
 fromExpr : Bool -> Expr -> String
 fromExpr showImplicitParens =
     recrExpr
-        (\id -> id)
+        identity
         (\id _ rec -> "(λ" ++ id ++ " . " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
             maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)

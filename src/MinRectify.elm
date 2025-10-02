@@ -28,7 +28,6 @@ freeAndBoundVars =
         )
 
 
-
 renameVar : Id -> Id -> Expr -> Expr
 renameVar oldId newId =
     recrExpr
@@ -53,10 +52,10 @@ renameVar oldId newId =
         (\_ rec1 _ rec2 -> App rec1 rec2)
         ConstTrue
         ConstFalse
-        (\_ rec -> IsZero rec)
+        (\_ -> IsZero)
         ConstZero
-        (\_ rec -> Succ rec)
-        (\_ rec -> Pred rec)
+        (\_ -> Succ)
+        (\_ -> Pred)
         (\_ rec1 _ rec2 _ rec3 -> If rec1 rec2 rec3)
 
 
