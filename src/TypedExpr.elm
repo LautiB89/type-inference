@@ -1,10 +1,9 @@
 module TypedExpr exposing (Context, TypedExpr(..), decorate, foldrTypedExpr, fromContext, fromTypedExpr, infer)
 
 import Dict exposing (Dict)
-import Expr exposing (Expr(..), Id)
-import NaiveRectify exposing (freeExprVars)
+import Expr exposing (Expr(..), Id, foldrExpr)
 import Restrictions exposing (Restrictions)
-import Set
+import Set exposing (Set)
 import Type exposing (Type(..), fromType)
 import Utils exposing (lift, lift3, maybeParens)
 
@@ -36,6 +35,21 @@ fromContext c =
                 |> List.foldr (\x y -> x ++ y) ""
     in
     "{" ++ res ++ "}"
+
+
+freeExprVars : Expr -> Set Id
+freeExprVars =
+    foldrExpr
+        Set.singleton
+        (\id rec -> Set.remove id rec)
+        (\rec1 rec2 -> Set.union rec1 rec2)
+        Set.empty
+        Set.empty
+        identity
+        Set.empty
+        identity
+        identity
+        (\rec1 rec2 rec3 -> Set.union rec1 (Set.union rec2 rec3))
 
 
 exprContext : Expr -> ( Int, Context )

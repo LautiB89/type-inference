@@ -4,7 +4,7 @@ import Browser
 import Dict
 import Expr exposing (Expr, fromExpr)
 import Html exposing (Html, button, div, h2, h4, text, textarea)
-import Html.Attributes exposing (..)
+import Html.Attributes exposing (cols, placeholder, rows, style, value)
 import Html.Events exposing (onClick, onInput)
 import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
