@@ -1,4 +1,4 @@
-module Expr exposing (..)
+module Expr exposing (Expr(..), Id, foldrExpr, fromExpr, recrExpr)
 
 import Utils exposing (maybeParens)
 

@@ -1,4 +1,4 @@
-module NaiveRectify exposing (naiveRectify, freeExprVars)
+module NaiveRectify exposing (freeExprVars)
 
 import Dict exposing (Dict)
 import Expr exposing (Expr(..), Id, foldrExpr)

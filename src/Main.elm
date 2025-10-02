@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Main exposing (AlgoIError(..), FullTrace, Model, Msg(..), main)
 
 import Browser
 import Dict
@@ -10,7 +10,7 @@ import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
 import Restrictions
     exposing
-        ( MguError(..)
+        ( MguError
         , Restrictions
         , Substitution
         , fromMguError
@@ -20,7 +20,7 @@ import Restrictions
         , simplifySubstitution
         , substitute
         )
-import Type exposing (Type(..), fromType)
+import Type exposing (Type, fromType)
 import TypedExpr
     exposing
         ( Context
@@ -127,7 +127,6 @@ showAlgoIError err =
             "MGU falló: " ++ fromMguError mguErr
 
 
-
 fullTrace : String -> Result AlgoIError FullTrace
 fullTrace s =
     case parse s of
@@ -152,19 +151,18 @@ fullTrace s =
 
                 Just ( t, r ) ->
                     Result.mapError MguErr
-                        (Result.andThen
+                        (Result.map
                             (\sus ->
-                                Ok
-                                    { str = s
-                                    , rectified = rectified
-                                    , untyped = expr
-                                    , typed = typed
-                                    , ctx = context
-                                    , res = r
-                                    , t = t
-                                    , sus = simplifySubstitution sus
-                                    , nextFreshN = n1
-                                    }
+                                { str = s
+                                , rectified = rectified
+                                , untyped = expr
+                                , typed = typed
+                                , ctx = context
+                                , res = r
+                                , t = t
+                                , sus = simplifySubstitution sus
+                                , nextFreshN = n1
+                                }
                             )
                             (mgu r)
                         )

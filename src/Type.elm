@@ -1,4 +1,4 @@
-module Type exposing (..)
+module Type exposing (Type(..), foldType, fromType, hasVar, replaceVar)
 
 import String exposing (fromInt)
 import Utils exposing (maybeParens)
@@ -19,10 +19,6 @@ foldType :
     -> Type
     -> a
 foldType fVar fNat fBool fAbs t =
-    let
-        rec =
-            foldType fVar fNat fBool fAbs
-    in
     case t of
         TVar n ->
             fVar n
@@ -34,6 +30,10 @@ foldType fVar fNat fBool fAbs t =
             fBool
 
         TAbs t1 t2 ->
+            let
+                rec =
+                    foldType fVar fNat fBool fAbs
+            in
             fAbs (rec t1) (rec t2)
 
 
@@ -52,10 +52,16 @@ fromType t =
         TAbs t1 t2 ->
             maybeParens (fromType t1) (isAbs t1) ++ "⭢" ++ fromType t2
 
+
 isAbs : Type -> Bool
-isAbs t = case t of
-    TAbs _ _ -> True
-    _ -> False
+isAbs t =
+    case t of
+        TAbs _ _ ->
+            True
+
+        _ ->
+            False
+
 
 replaceVar : Int -> Type -> Type -> Type
 replaceVar n t =

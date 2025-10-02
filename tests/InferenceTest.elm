@@ -2,7 +2,6 @@ module InferenceTest exposing (suite)
 
 import Dict
 import Expect
-import Expr exposing (Expr(..))
 import Restrictions
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))

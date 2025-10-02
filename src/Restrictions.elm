@@ -1,5 +1,6 @@
 module Restrictions exposing
     ( MguError(..)
+    , Restriction
     , Restrictions
     , Substitution
     , empty
@@ -7,9 +8,7 @@ module Restrictions exposing
     , fromRestrictions
     , fromSubstitution
     , insert
-    , member
     , mgu
-    , remove
     , simplifySubstitution
     , singleton
     , substitute
@@ -50,11 +49,6 @@ insert r c =
 
     else
         r :: c
-
-
-remove : Restriction -> Restrictions -> Restrictions
-remove r c =
-    List.filter (\r2 -> r /= r2) c
 
 
 union : Restrictions -> Restrictions -> Restrictions

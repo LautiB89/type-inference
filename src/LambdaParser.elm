@@ -1,10 +1,6 @@
-module LambdaParser exposing
-    ( parse
-    , viewExpr
-    , viewTypedExpr
-    )
+module LambdaParser exposing (parse)
 
-import Expr exposing (Expr(..), fromExpr)
+import Expr exposing (Expr(..))
 import List exposing (foldl)
 import Parser
     exposing
@@ -13,7 +9,6 @@ import Parser
         , DeadEnd
         , Parser
         , Step(..)
-        , Trailing(..)
         , end
         , keyword
         , lazy
@@ -25,7 +20,6 @@ import Parser
         , variable
         )
 import Set
-import TypedExpr exposing (TypedExpr, fromTypedExpr)
 
 
 
@@ -157,23 +151,3 @@ lambdaParser =
 parse : String -> Result (List DeadEnd) Expr
 parse =
     run (lambdaParser |. end)
-
-
-viewExpr : Bool -> Result (List DeadEnd) Expr -> String
-viewExpr showImplicitParens res =
-    case res of
-        Ok expr ->
-            fromExpr showImplicitParens expr
-
-        Err _ ->
-            "Parsing failed"
-
-
-viewTypedExpr : Bool -> Result (List DeadEnd) TypedExpr -> String
-viewTypedExpr showImplicitParens res =
-    case res of
-        Ok expr ->
-            fromTypedExpr showImplicitParens expr
-
-        Err _ ->
-            "Parsing failed"

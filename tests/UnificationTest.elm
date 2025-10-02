@@ -1,11 +1,9 @@
 module UnificationTest exposing (suite)
 
 import Expect exposing (Expectation)
-import Expr exposing (Expr(..))
 import Restrictions exposing (MguError(..), Restrictions, mgu)
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))
-import TypedExpr exposing (TypedExpr(..))
 
 
 suite : Test
