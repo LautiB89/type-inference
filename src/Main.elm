@@ -1,4 +1,4 @@
-module Main exposing (AlgoIError(..), FullTrace, Model, Msg(..), main)
+module Main exposing (Model, Msg(..), main)
 
 import Browser
 import Dict
@@ -12,14 +12,11 @@ import Restrictions
     exposing
         ( MguError
         , Restrictions
-        , Substitution
         , fromMguError
         , fromRestrictions
-        , fromSubstitution
         , mgu
-        , simplifySubstitution
-        , substitute
         )
+import Substitution exposing (Substitution, fromSubstitution, simplifySubstitution, substitute)
 import Type exposing (Type, fromType)
 import TypedExpr
     exposing
@@ -101,43 +98,72 @@ stepDiv title xs =
         ]
 
 
-type alias FullTrace =
-    { inputStr : String
-    , rectExpr : Expr
-    , plainExpr : Expr
-    , typedExpr : TypedExpr
-    , context : Context
-    , restrictions : Restrictions
-    , exprType : Type
-    , substitution : Substitution
-    , nextFreshN : Int
-    }
+
+-- type alias FullTrace =
+--     { inputStr : String
+--     , rectExpr : Expr
+--     , plainExpr : Expr
+--     , typedExpr : TypedExpr
+--     , context : Context
+--     , restrictions : Restrictions
+--     , exprType : Type
+--     , substitution : Substitution
+--     , nextFreshN : Int
+--     }
+-- type AlgoIError
+--     = ParsingError
+--     | UnexpectedInferError
+--     | MguErr MguError
+-- showAlgoIError : AlgoIError -> String
+-- showAlgoIError err =
+--     case err of
+--         ParsingError ->
+--             "Error de parsing"
+--         UnexpectedInferError ->
+--             "Error inesperado durante la inferencia"
+--         MguErr mguErr ->
+--             "MGU falló: " ++ fromMguError mguErr
 
 
-type AlgoIError
-    = ParsingError
-    | UnexpectedInferError
-    | MguErr MguError
+type Trace
+    = ParsingError String
+    | InferError
+        { inputStr : String
+        , plainExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , typedExpr : TypedExpr
+        , nextFreshN : Int
+        }
+    | MguFailed
+        MguError
+        { inputStr : String
+        , plainExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , typedExpr : TypedExpr
+        , restrictions : Restrictions
+        , exprType : Type
+        , nextFreshN : Int
+        }
+    | MguOk
+        { inputStr : String
+        , rectExpr : Expr
+        , plainExpr : Expr
+        , typedExpr : TypedExpr
+        , context : Context
+        , restrictions : Restrictions
+        , exprType : Type
+        , substitution : Substitution
+        , nextFreshN : Int
+        }
 
 
-showAlgoIError : AlgoIError -> String
-showAlgoIError err =
-    case err of
-        ParsingError ->
-            "Error de parsing"
-
-        UnexpectedInferError ->
-            "Error inesperado durante la inferencia"
-
-        MguErr mguErr ->
-            "MGU falló: " ++ fromMguError mguErr
-
-
-fullTrace : String -> Result AlgoIError FullTrace
-fullTrace s =
+getTrace : String -> Trace
+getTrace s =
     case parse s of
         Err _ ->
-            Err ParsingError
+            ParsingError s
 
         Ok parsedExpr ->
             let
@@ -148,17 +174,39 @@ fullTrace s =
                 ( context, typed, n1 ) =
                     decorate rectified
 
-                ( may, _ ) =
+                ( may, n2 ) =
                     infer context typed n1
+
+                okInferResult =
+                    { inputStr = s
+                    , plainExpr = parsedExpr
+                    , rectExpr = rectified
+                    , context = context
+                    , typedExpr = typed
+                    , nextFreshN = n1
+                    }
             in
             case may of
                 Nothing ->
-                    Err UnexpectedInferError
+                    InferError okInferResult
 
                 Just ( exprType, restrictions ) ->
-                    Result.mapError MguErr
-                        (Result.map
-                            (\sus ->
+                    case mgu restrictions of
+                        Err mguErr ->
+                            MguFailed
+                                mguErr
+                                { inputStr = s
+                                , plainExpr = parsedExpr
+                                , rectExpr = rectified
+                                , context = context
+                                , typedExpr = typed
+                                , nextFreshN = n1
+                                , restrictions = restrictions
+                                , exprType = exprType
+                                }
+
+                        Ok sus ->
+                            MguOk
                                 { inputStr = s
                                 , rectExpr = rectified
                                 , plainExpr = parsedExpr
@@ -167,11 +215,8 @@ fullTrace s =
                                 , restrictions = restrictions
                                 , exprType = exprType
                                 , substitution = simplifySubstitution sus
-                                , nextFreshN = n1
+                                , nextFreshN = n2
                                 }
-                            )
-                            (mgu restrictions)
-                        )
 
 
 view : Model -> Html Msg
@@ -184,8 +229,8 @@ view model =
             else
                 b
 
-        aaa =
-            fullTrace model.content
+        trace =
+            getTrace model.content
     in
     div
         [ style "max-width" "600px"
@@ -219,28 +264,57 @@ view model =
                     (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
                 ]
             ]
-        , case aaa of
-            Err err ->
-                stepDiv "Ocurrió un error" [ text (showAlgoIError err) ]
+        , case trace of
+            ParsingError s ->
+                stepDiv "Ocurrió un error" [ text ("No se pudo reconocer el término " ++ s) ]
 
-            Ok { context, rectExpr, restrictions, substitution, exprType, typedExpr, plainExpr, nextFreshN } ->
+            InferError t ->
                 div []
-                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens plainExpr) ]
-                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens rectExpr) ]
+                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
+                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
                     , stepDiv "2. Anotación"
-                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens typedExpr) ]
-                        , div [] [ text ("Γ0: " ++ fromContext context) ]
+                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
+                        , div [] [ text ("Γ0: " ++ fromContext t.context) ]
                         ]
                     , stepDiv "3. Generación de restricciones"
-                        [ div [] [ text ("Tipo: " ++ fromType exprType) ]
-                        , div [] [ text ("Restricciones: " ++ fromRestrictions restrictions) ]
+                        [ div [] [ text "Error inesperado en el algoritmo de inferencia" ]
+                        ]
+                    ]
+
+            MguFailed mguErr t ->
+                div []
+                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
+                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
+                    , stepDiv "2. Anotación"
+                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
+                        , div [] [ text ("Γ0: " ++ fromContext t.context) ]
+                        ]
+                    , stepDiv "3. Generación de restricciones"
+                        [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
+                        , div [] [ text ("Restricciones: " ++ fromRestrictions t.restrictions) ]
                         ]
                     , stepDiv "4. Unificación"
-                        [ div [] [ text ("Sustitución: " ++ fromSubstitution substitution nextFreshN) ] ]
+                        [ div [] [ text (fromMguError mguErr) ] ]
+                    ]
+
+            MguOk t ->
+                div []
+                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
+                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
+                    , stepDiv "2. Anotación"
+                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
+                        , div [] [ text ("Γ0: " ++ fromContext t.context) ]
+                        ]
+                    , stepDiv "3. Generación de restricciones"
+                        [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
+                        , div [] [ text ("Restricciones: " ++ fromRestrictions t.restrictions) ]
+                        ]
+                    , stepDiv "4. Unificación"
+                        [ div [] [ text ("Sustitución: " ++ fromSubstitution t.substitution t.nextFreshN) ] ]
                     , stepDiv "Resultado"
-                        [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute substitution t1) context)) ]
-                        , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr substitution typedExpr)) ]
-                        , div [] [ text ("Tipo: " ++ fromType (substitute substitution exprType)) ]
+                        [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute t.substitution t1) t.context)) ]
+                        , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr t.substitution t.typedExpr)) ]
+                        , div [] [ text ("Tipo: " ++ fromType (substitute t.substitution t.exprType)) ]
                         ]
                     ]
         ]

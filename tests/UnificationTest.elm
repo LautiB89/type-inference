@@ -2,6 +2,7 @@ module UnificationTest exposing (suite)
 
 import Expect exposing (Expectation)
 import Restrictions exposing (MguError(..), Restrictions, mgu)
+import Substitution exposing (apply)
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))
 
@@ -146,7 +147,7 @@ expectMgu restrictions varDom expectedRes =
             mgu restrictions
     in
     Expect.equal
-        (Result.map (\sust -> List.map (\n -> ( n, sust n )) varDom) resSust)
+        (Result.map (\sust -> List.map (\n -> ( n, apply sust n )) varDom) resSust)
         expectedRes
 
 

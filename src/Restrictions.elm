@@ -2,21 +2,18 @@ module Restrictions exposing
     ( MguError(..)
     , Restriction
     , Restrictions
-    , Substitution
     , empty
     , fromMguError
     , fromRestrictions
-    , fromSubstitution
     , insert
     , mgu
-    , simplifySubstitution
     , singleton
-    , substitute
     , union
     )
 
 import List
-import Type exposing (Type(..), foldType, fromType, hasVar, replaceVar)
+import Substitution exposing (Substitution(..), insert)
+import Type exposing (Type(..), fromType, hasVar, replaceVar)
 
 
 type alias Restriction =
@@ -56,14 +53,6 @@ union c1 c2 =
     c1 ++ List.filter (\x -> not <| List.member x c1) c2
 
 
-
--- Restrictions solver
-
-
-type alias Substitution =
-    Int -> Type
-
-
 type MguError
     = Clash Type Type
     | OccursCheck Type Type
@@ -87,9 +76,13 @@ mgu : Restrictions -> Result MguError Substitution
 mgu ys =
     case ys of
         [] ->
-            Ok (\n -> TVar n)
+            Ok (Substitution (\n -> TVar n))
 
         ( s1, s2 ) :: xs ->
+            let
+                swap =
+                    insert ( s2, s1 ) xs
+            in
             case s1 of
                 TAbs d1 d2 ->
                     case s2 of
@@ -97,7 +90,7 @@ mgu ys =
                             mgu (insert ( d1, t1 ) (insert ( d2, t2 ) xs))
 
                         TVar _ ->
-                            mgu (insert ( s2, s1 ) xs)
+                            mgu swap
 
                         _ ->
                             Err (Clash s1 s2)
@@ -108,7 +101,7 @@ mgu ys =
                             mgu xs
 
                         TVar _ ->
-                            mgu (insert ( s2, s1 ) xs)
+                            mgu swap
 
                         _ ->
                             Err (Clash s1 s2)
@@ -119,90 +112,31 @@ mgu ys =
                             mgu xs
 
                         TVar _ ->
-                            mgu (insert ( s2, s1 ) xs)
+                            mgu swap
 
                         _ ->
                             Err (Clash s1 s2)
 
                 TVar n ->
+                    let
+                        replace =
+                            Result.map (Substitution.insert n s2) <|
+                                mgu (List.map (Tuple.mapBoth (replaceVar n s2) (replaceVar n s2)) xs)
+                    in
                     case s2 of
                         TVar m ->
                             if n == m then
                                 mgu xs
 
                             else
-                                mgu (List.map (Tuple.mapBoth (replaceVar n s2) (replaceVar n s2)) xs)
-                                    |> Result.map
-                                        (\s ->
-                                            \i ->
-                                                if i == n then
-                                                    s2
-
-                                                else
-                                                    s i
-                                        )
+                                replace
 
                         _ ->
                             if hasVar n s2 then
                                 Err (OccursCheck s1 s2)
 
                             else
-                                mgu (List.map (Tuple.mapBoth (replaceVar n s2) (replaceVar n s2)) xs)
-                                    |> Result.map
-                                        (\s ->
-                                            \i ->
-                                                if i == n then
-                                                    s2
-
-                                                else
-                                                    s i
-                                        )
-
-
-simplifySubstitution : Substitution -> Substitution
-simplifySubstitution s =
-    \n ->
-        let
-            t =
-                s n
-        in
-        case t of
-            TNat ->
-                TNat
-
-            TBool ->
-                TBool
-
-            TVar m ->
-                if m == n then
-                    TVar n
-
-                else
-                    s m
-
-            TAbs t1 t2 ->
-                TAbs (substitute s t1) (substitute s t2)
-
-
-substitute : Substitution -> Type -> Type
-substitute s =
-    foldType s TNat TBool TAbs
-
-
-fromSubstitution : Substitution -> Int -> String
-fromSubstitution s n =
-    let
-        res =
-            List.range 1 (n - 1)
-                |> List.map (\k -> fromType (TVar k) ++ ":=" ++ fromType (s k))
-                |> List.intersperse ", "
-                |> List.foldr (\s1 s2 -> s1 ++ s2) ""
-    in
-    "{" ++ res ++ "}"
-
-
-
--- Show
+                                replace
 
 
 fromRestriction : Restriction -> String
