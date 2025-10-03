@@ -1,6 +1,6 @@
 module Expr exposing (Expr(..), Id, foldrExpr, fromExpr, recrExpr)
 
-import UnicodeSmallDigit exposing (shrink)
+import UnicodeSmallDigit exposing (shrinkDigits)
 import Utils exposing (maybeParens)
 
 
@@ -124,7 +124,7 @@ recrExpr fVar fAbs fApp fTrue fFalse fIsZero fZero fSucc fPred fIf expr =
 fromExpr : Bool -> Expr -> String
 fromExpr showImplicitParens =
     recrExpr
-        shrink
+        shrinkDigits
         (\id _ rec -> "(λ" ++ id ++ ". " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
             maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)

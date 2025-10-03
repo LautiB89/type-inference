@@ -5,7 +5,7 @@ import Expr exposing (Expr(..), Id, foldrExpr)
 import Restrictions exposing (Restrictions)
 import Set exposing (Set)
 import Type exposing (Type(..), fromType)
-import UnicodeSmallDigit exposing (shrink)
+import UnicodeSmallDigit exposing (shrinkDigits)
 import Utils exposing (lift, lift2, lift3, maybeParens)
 
 
@@ -244,8 +244,8 @@ recrTypedExpr fVar fAbs fApp fTrue fFalse fIsZero fZero fSucc fPred fIf expr =
 fromTypedExpr : Bool -> TypedExpr -> String
 fromTypedExpr showImplicitParens =
     recrTypedExpr
-        shrink
-        (\id t _ rec -> "(λ" ++ id ++ ": " ++ fromType t ++ ". " ++ rec ++ ")")
+        shrinkDigits
+        (\id t _ rec -> "(λ" ++ shrinkDigits id ++ ":" ++ fromType t ++ ". " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
             maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)
         )
