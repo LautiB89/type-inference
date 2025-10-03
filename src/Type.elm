@@ -51,7 +51,7 @@ fromType t =
             "Bool"
 
         TAbs t1 t2 ->
-            maybeParens (fromType t1) (isAbs t1) ++ "⭢" ++ fromType t2
+            maybeParens (fromType t1) (isAbs t1) ++ "→" ++ fromType t2
 
 
 isAbs : Type -> Bool
