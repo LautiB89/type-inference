@@ -55,7 +55,9 @@ type alias Model =
 
 init : Model
 init =
-    { content = "", showImplicitParens = False }
+    { content = ""
+    , showImplicitParens = False
+    }
 
 
 
@@ -132,7 +134,7 @@ type Trace
         , plainExpr : Expr
         , rectExpr : Expr
         , context : Context
-        , typedExpr : TypedExpr
+        , annotatedExpr : TypedExpr
         , nextFreshN : Int
         }
     | MguFailed
@@ -141,7 +143,7 @@ type Trace
         , plainExpr : Expr
         , rectExpr : Expr
         , context : Context
-        , typedExpr : TypedExpr
+        , annotatedExpr : TypedExpr
         , restrictions : Restrictions
         , exprType : Type
         , nextFreshN : Int
@@ -171,18 +173,18 @@ getTrace s =
                 rectified =
                     minRectify parsedExpr
 
-                ( context, typed, n1 ) =
+                ( context, annotated, n1 ) =
                     decorate rectified
 
                 ( may, n2 ) =
-                    infer context typed n1
+                    infer context annotated n1
 
                 okInferResult =
                     { inputStr = s
                     , plainExpr = parsedExpr
                     , rectExpr = rectified
                     , context = context
-                    , typedExpr = typed
+                    , annotatedExpr = annotated
                     , nextFreshN = n1
                     }
             in
@@ -199,7 +201,7 @@ getTrace s =
                                 , plainExpr = parsedExpr
                                 , rectExpr = rectified
                                 , context = context
-                                , typedExpr = typed
+                                , annotatedExpr = annotated
                                 , nextFreshN = n1
                                 , restrictions = restrictions
                                 , exprType = exprType
@@ -210,7 +212,7 @@ getTrace s =
                                 { inputStr = s
                                 , rectExpr = rectified
                                 , plainExpr = parsedExpr
-                                , typedExpr = typed
+                                , typedExpr = annotated
                                 , context = context
                                 , restrictions = restrictions
                                 , exprType = exprType
@@ -233,7 +235,7 @@ view model =
             getTrace model.content
     in
     div
-        [ style "max-width" "600px"
+        [ style "width" "70%"
         , style "margin" "40px auto"
         , style "font-family" "sans-serif"
         , style "font-size" "16px"
@@ -243,7 +245,7 @@ view model =
             [ value model.content
             , onInput Change
             , placeholder "(\\x.x x) (\\y.y y)"
-            , rows 4
+            , rows 2
             , cols 60
             , style "margin-bottom" "12px"
             , style "font-size" "16px"
@@ -273,8 +275,8 @@ view model =
                     [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
                     , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
                     , stepDiv "2. Anotación"
-                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
-                        , div [] [ text ("Γ0: " ++ fromContext t.context) ]
+                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.annotatedExpr) ]
+                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
                         ]
                     , stepDiv "3. Generación de restricciones"
                         [ div [] [ text "Error inesperado en el algoritmo de inferencia" ]
@@ -286,8 +288,8 @@ view model =
                     [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
                     , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
                     , stepDiv "2. Anotación"
-                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
-                        , div [] [ text ("Γ0: " ++ fromContext t.context) ]
+                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.annotatedExpr) ]
+                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
                         ]
                     , stepDiv "3. Generación de restricciones"
                         [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
@@ -302,8 +304,8 @@ view model =
                     [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
                     , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
                     , stepDiv "2. Anotación"
-                        [ div [] [ text ("M0: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
-                        , div [] [ text ("Γ0: " ++ fromContext t.context) ]
+                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
+                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
                         ]
                     , stepDiv "3. Generación de restricciones"
                         [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]

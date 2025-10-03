@@ -1,6 +1,7 @@
 module Type exposing (Type(..), foldType, fromType, hasVar, replaceVar)
 
 import String exposing (fromInt)
+import UnicodeSmallDigit exposing (fromDigit)
 import Utils exposing (maybeParens)
 
 
@@ -41,7 +42,7 @@ fromType : Type -> String
 fromType t =
     case t of
         TVar n ->
-            "X" ++ fromInt n
+            "X" ++ String.map fromDigit (fromInt n)
 
         TNat ->
             "Nat"

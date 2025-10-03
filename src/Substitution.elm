@@ -65,7 +65,8 @@ fromSubstitution (Substitution s) n =
     let
         res =
             List.range 1 (n - 1)
-                |> List.map (\k -> fromType (TVar k) ++ ":=" ++ fromType (s k))
+                |> List.filter (\k -> TVar k /= s k)
+                |> List.map (\k -> fromType (TVar k) ++ "≔" ++ fromType (s k))
                 |> List.intersperse ", "
                 |> List.foldr (\s1 s2 -> s1 ++ s2) ""
     in

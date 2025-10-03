@@ -141,7 +141,7 @@ mgu ys =
 
 fromRestriction : Restriction -> String
 fromRestriction ( t1, t2 ) =
-    fromType t1 ++ "=" ++ fromType t2
+    fromType t1 ++ "≟" ++ fromType t2
 
 
 fromRestrictions : Restrictions -> String
