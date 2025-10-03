@@ -125,7 +125,7 @@ fromExpr : Bool -> Expr -> String
 fromExpr showImplicitParens =
     recrExpr
         shrink
-        (\id _ rec -> "(λ" ++ id ++ " . " ++ rec ++ ")")
+        (\id _ rec -> "(λ" ++ id ++ ". " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
             maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)
         )

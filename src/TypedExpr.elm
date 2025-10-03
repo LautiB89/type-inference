@@ -245,7 +245,7 @@ fromTypedExpr : Bool -> TypedExpr -> String
 fromTypedExpr showImplicitParens =
     recrTypedExpr
         shrink
-        (\id t _ rec -> "(λ" ++ id ++ ": " ++ fromType t ++ " . " ++ rec ++ ")")
+        (\id t _ rec -> "(λ" ++ id ++ ": " ++ fromType t ++ ". " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
             maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)
         )
