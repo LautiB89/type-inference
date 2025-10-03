@@ -314,9 +314,13 @@ view model =
                     , stepDiv "4. Unificación"
                         [ div [] [ text ("Sustitución: " ++ fromSubstitution t.substitution t.nextFreshN) ] ]
                     , stepDiv "Resultado"
-                        [ div [] [ text ("Γ: " ++ fromContext (Dict.map (\_ t1 -> substitute t.substitution t1) t.context)) ]
-                        , div [] [ text ("M: " ++ fromTypedExpr model.showImplicitParens (substituteExpr t.substitution t.typedExpr)) ]
-                        , div [] [ text ("Tipo: " ++ fromType (substitute t.substitution t.exprType)) ]
+                        [ div []
+                            [ text
+                                (fromContext (Dict.map (\_ t1 -> substitute t.substitution t1) t.context)
+                                    ++ (" ⊢ " ++ fromTypedExpr model.showImplicitParens (substituteExpr t.substitution t.typedExpr))
+                                    ++ (" : " ++ fromType (substitute t.substitution t.exprType))
+                                )
+                            ]
                         ]
                     ]
         ]
