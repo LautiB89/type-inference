@@ -1,4 +1,4 @@
-module UnicodeSmallDigit exposing (fromDigit)
+module UnicodeSmallDigit exposing (shrink)
 
 
 fromDigit : Char -> Char
@@ -36,3 +36,8 @@ fromDigit c =
 
         _ ->
             c
+
+
+shrink : String -> String
+shrink =
+    String.map fromDigit

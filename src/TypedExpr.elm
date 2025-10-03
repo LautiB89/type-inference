@@ -5,8 +5,8 @@ import Expr exposing (Expr(..), Id, foldrExpr)
 import Restrictions exposing (Restrictions)
 import Set exposing (Set)
 import Type exposing (Type(..), fromType)
-import UnicodeSmallDigit exposing (fromDigit)
-import Utils exposing (lift, lift3, maybeParens)
+import UnicodeSmallDigit exposing (shrink)
+import Utils exposing (lift, lift2, lift3, maybeParens)
 
 
 type TypedExpr
@@ -244,7 +244,7 @@ recrTypedExpr fVar fAbs fApp fTrue fFalse fIsZero fZero fSucc fPred fIf expr =
 fromTypedExpr : Bool -> TypedExpr -> String
 fromTypedExpr showImplicitParens =
     recrTypedExpr
-        (String.map fromDigit)
+        shrink
         (\id t _ rec -> "(λ" ++ id ++ ": " ++ fromType t ++ " . " ++ rec ++ ")")
         (\e1 rec1 e2 rec2 ->
             maybeParens rec1 ((isApp e1 && showImplicitParens) || isIf e1) ++ " " ++ maybeParens rec2 (isApp e2)
@@ -305,27 +305,18 @@ infer context e n =
                 n
 
         TEApp e1 e2 ->
-            let
-                ( rec1, n1 ) =
-                    infer context e1 n
-
-                ( rec2, n2 ) =
-                    infer context e2 n1
-
-                res =
-                    Maybe.map2
-                        (\( type1, rest1 ) ->
-                            \( type2, rest2 ) ->
-                                ( TVar n2
-                                , Restrictions.insert
-                                    ( type1, TAbs type2 (TVar n2) )
-                                    (Restrictions.union rest1 rest2)
-                                )
-                        )
-                        rec1
-                        rec2
-            in
-            ( res, n2 + 1 )
+            lift2
+                (infer context)
+                (\( type1, rest1 ) ( type2, rest2 ) ->
+                    ( TVar n
+                    , Restrictions.insert
+                        ( type1, TAbs type2 (TVar n) )
+                        (Restrictions.union rest1 rest2)
+                    )
+                )
+                e1
+                e2
+                (n + 1)
 
         TEConstTrue ->
             ( Just ( TBool, Restrictions.empty ), n )
