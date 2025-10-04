@@ -57,9 +57,9 @@ natInferenceTest =
                     )
                     ( Just
                         ( TNat
-                        , [ ( TVar 5, TNat )
-                          , ( TVar 4, TAbs (TVar 1) (TVar 5) )
-                          , ( TVar 3, TAbs (TVar 2) (TVar 4) )
+                        , [ ( TVar 4, TNat )
+                          , ( TVar 5, TAbs (TVar 1) (TVar 4) )
+                          , ( TVar 3, TAbs (TVar 2) (TVar 5) )
                           ]
                         )
                     , 6

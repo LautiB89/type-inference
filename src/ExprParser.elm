@@ -1,4 +1,4 @@
-module LambdaParser exposing (parse)
+module ExprParser exposing (parse)
 
 import Expr exposing (Expr(..))
 import List exposing (foldl)
@@ -37,7 +37,17 @@ natParser =
         , succeed Pred
             |. keyword "pred"
             |= betweenParens (lazy (\_ -> lambdaParser))
+        , Parser.map intToNatExpr Parser.int
         ]
+
+
+intToNatExpr : Int -> Expr
+intToNatExpr n =
+    if n > 0 then
+        Succ (intToNatExpr (n - 1))
+
+    else
+        ConstZero
 
 
 

@@ -2,7 +2,7 @@ module LambdaParserTest exposing (suite)
 
 import Expect
 import Expr exposing (Expr(..))
-import LambdaParser exposing (parse)
+import ExprParser exposing (parse)
 import Test exposing (Test, describe, test)
 
 

@@ -3,10 +3,10 @@ module Main exposing (Model, Msg(..), main)
 import Browser
 import Dict
 import Expr exposing (Expr, fromExpr)
+import ExprParser exposing (parse)
 import Html exposing (Html, button, div, h2, h4, text, textarea)
 import Html.Attributes exposing (cols, placeholder, rows, style, value)
 import Html.Events exposing (onClick, onInput)
-import LambdaParser exposing (parse)
 import MinRectify exposing (minRectify)
 import Restrictions
     exposing
@@ -98,33 +98,6 @@ stepDiv title xs =
             ]
             xs
         ]
-
-
-
--- type alias FullTrace =
---     { inputStr : String
---     , rectExpr : Expr
---     , plainExpr : Expr
---     , typedExpr : TypedExpr
---     , context : Context
---     , restrictions : Restrictions
---     , exprType : Type
---     , substitution : Substitution
---     , nextFreshN : Int
---     }
--- type AlgoIError
---     = ParsingError
---     | UnexpectedInferError
---     | MguErr MguError
--- showAlgoIError : AlgoIError -> String
--- showAlgoIError err =
---     case err of
---         ParsingError ->
---             "Error de parsing"
---         UnexpectedInferError ->
---             "Error inesperado durante la inferencia"
---         MguErr mguErr ->
---             "MGU falló: " ++ fromMguError mguErr
 
 
 type Trace
