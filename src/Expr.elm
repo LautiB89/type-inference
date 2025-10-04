@@ -1,5 +1,6 @@
 module Expr exposing (Expr(..), Id, foldrExpr, fromExpr, recrExpr)
 
+import String exposing (fromInt)
 import UnicodeSmallDigit exposing (shrinkDigits)
 import Utils exposing (maybeParens)
 
@@ -121,8 +122,8 @@ recrExpr fVar fAbs fApp fTrue fFalse fIsZero fZero fSucc fPred fIf expr =
             fIf e1 (rec e1) e2 (rec e2) e3 (rec e3)
 
 
-fromExpr : Bool -> Expr -> String
-fromExpr showImplicitParens =
+fromExpr : Bool -> Bool -> Expr -> String
+fromExpr showImplicitParens showNumerals =
     recrExpr
         shrinkDigits
         (\id _ rec -> "(λ" ++ shrinkDigits id ++ ". " ++ rec ++ ")")
@@ -133,8 +134,8 @@ fromExpr showImplicitParens =
         "false"
         (\_ rec -> "isZero(" ++ rec ++ ")")
         "0"
-        (\_ rec -> "succ(" ++ rec ++ ")")
-        (\_ rec -> "pred(" ++ rec ++ ")")
+        (\e rec -> maybeConvertToNumeral showNumerals (Succ e) ("succ(" ++ rec ++ ")"))
+        (\e rec -> maybeConvertToNumeral showNumerals (Pred e) ("pred(" ++ rec ++ ")"))
         (\_ rec1 _ rec2 _ rec3 ->
             "if "
                 ++ rec1
@@ -143,6 +144,33 @@ fromExpr showImplicitParens =
                 ++ " else "
                 ++ rec3
         )
+
+
+maybeConvertToNumeral : Bool -> Expr -> String -> String
+maybeConvertToNumeral convert e default =
+    if convert then
+        natToInt e
+            |> Maybe.map fromInt
+            |> Maybe.withDefault default
+
+    else
+        default
+
+
+natToInt : Expr -> Maybe Int
+natToInt e =
+    case e of
+        ConstZero ->
+            Just 0
+
+        Succ e1 ->
+            Maybe.map (\n -> n + 1) (natToInt e1)
+
+        Pred e1 ->
+            Maybe.map (\n -> max 0 (n - 1)) (natToInt e1)
+
+        _ ->
+            Nothing
 
 
 isApp : Expr -> Bool
