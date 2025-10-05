@@ -1,8 +1,9 @@
 module UnificationTest exposing (suite)
 
 import Expect exposing (Expectation)
+import List exposing (foldr)
 import Restrictions exposing (MguError(..), Restrictions, mgu)
-import Substitution exposing (apply)
+import Substitution exposing (Substitution, apply, simplifySubs)
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))
 
@@ -59,7 +60,31 @@ examplesTest =
                         , ( 4, TVar 4 )
                         ]
                     )
+        , test "Simplify complex substitution" <|
+            \_ ->
+                Expect.equalLists
+                    (List.map (\n -> ( n, apply exampleSust n )) [ 1, 2, 3, 4, 5 ])
+                    [ ( 1, TAbs TBool TBool )
+                    , ( 2, TAbs TBool TBool )
+                    , ( 3, TAbs TNat (TAbs TBool TBool) )
+                    , ( 4, TNat )
+                    , ( 5, TAbs TNat (TAbs TBool TBool) )
+                    ]
         ]
+
+
+exampleSust : Substitution
+exampleSust =
+    simplifySubs <|
+        foldr
+            (\( n, t ) rec -> Substitution.insert n t rec)
+            Substitution.empty
+            [ ( 1, TVar 2 )
+            , ( 2, TAbs TBool TBool )
+            , ( 4, TNat )
+            , ( 3, TAbs (TVar 4) (TVar 2) )
+            , ( 5, TVar 3 )
+            ]
 
 
 clashTest : Test

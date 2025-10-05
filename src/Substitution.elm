@@ -1,4 +1,12 @@
-module Substitution exposing (..)
+module Substitution exposing
+    ( Substitution
+    , apply
+    , empty
+    , fromSubstitution
+    , insert
+    , simplifySubs
+    , substitute
+    )
 
 import Type
     exposing
@@ -12,30 +20,46 @@ type Substitution
     = Substitution (Int -> Type)
 
 
-simplifySubstitution : Substitution -> Substitution
-simplifySubstitution s =
-    Substitution <|
-        \n ->
+empty : Substitution
+empty =
+    Substitution
+        (\n ->
+            TVar n
+        )
+
+
+simplify : (Int -> Type) -> Type -> Type
+simplify s t =
+    case t of
+        TNat ->
+            TNat
+
+        TBool ->
+            TBool
+
+        TVar m ->
             let
-                t =
-                    apply s n
+                t2 =
+                    s m
             in
-            case t of
-                TNat ->
-                    TNat
-
-                TBool ->
-                    TBool
-
-                TVar m ->
-                    if m == n then
-                        TVar n
+            case t2 of
+                TVar n ->
+                    if n == m then
+                        t
 
                     else
-                        apply s m
+                        simplify s (s m)
 
-                TAbs t1 t2 ->
-                    TAbs (substitute s t1) (substitute s t2)
+                _ ->
+                    simplify s t2
+
+        TAbs t1 t2 ->
+            TAbs (simplify s t1) (simplify s t2)
+
+
+simplifySubs : Substitution -> Substitution
+simplifySubs (Substitution s) =
+    Substitution (\n -> simplify s (s n))
 
 
 substitute : Substitution -> Type -> Type
@@ -50,14 +74,13 @@ apply (Substitution s) n =
 
 insert : Int -> Type -> Substitution -> Substitution
 insert n t (Substitution s) =
-    Substitution
-        (\i ->
-            if i == n then
+    Substitution <|
+        \m ->
+            if m == n then
                 t
 
             else
-                s i
-        )
+                s m
 
 
 fromSubstitution : Substitution -> Int -> String
