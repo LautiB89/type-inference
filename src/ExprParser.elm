@@ -30,14 +30,14 @@ natParser : Parser Expr
 natParser =
     oneOf
         [ succeed ConstZero
-            |. symbol "zero"
+            |. keyword "zero"
         , succeed Succ
             |. keyword "succ"
             |= betweenParens (lazy (\_ -> lambdaParser))
         , succeed Pred
             |. keyword "pred"
             |= betweenParens (lazy (\_ -> lambdaParser))
-        , Parser.map intToNatExpr Parser.int
+        , Parser.backtrackable <| Parser.map intToNatExpr Parser.int
         ]
 
 
@@ -154,7 +154,6 @@ lambdaParser =
     oneOf
         [ appParser
         , nonAppParser
-        , betweenParens (lazy (\_ -> lambdaParser))
         ]
 
 
