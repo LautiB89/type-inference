@@ -30,25 +30,17 @@ freeAndBoundVars =
 
 renameVar : Id -> Id -> Expr -> Expr
 renameVar oldId newId =
+    let
+        ifIsOldId id a b =
+            if id == oldId then
+                a
+
+            else
+                b
+    in
     recrExpr
-        (\id ->
-            Var
-                (if id == oldId then
-                    newId
-
-                 else
-                    id
-                )
-        )
-        (\id e1 rec1 ->
-            Abs id
-                (if id == oldId then
-                    e1
-
-                 else
-                    rec1
-                )
-        )
+        (\id -> Var (ifIsOldId id newId id))
+        (\id e1 rec1 -> Abs id (ifIsOldId id e1 rec1))
         (\_ rec1 _ rec2 -> App rec1 rec2)
         ConstTrue
         ConstFalse
