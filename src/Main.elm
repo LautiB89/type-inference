@@ -16,7 +16,7 @@ import Restrictions
         , fromRestrictions
         , mgu
         )
-import Substitution exposing (Substitution, fromSubstitution, simplifySubstitution, substitute)
+import Substitution exposing (Substitution, fromSubstitution, simplifySubs, substitute)
 import Type exposing (Type, fromType)
 import TypedExpr
     exposing
@@ -180,7 +180,7 @@ getTrace s =
                                 , exprType = exprType
                                 }
 
-                        Ok sus ->
+                        Ok substitution ->
                             MguOk
                                 { inputStr = s
                                 , rectExpr = rectified
@@ -189,7 +189,7 @@ getTrace s =
                                 , context = context
                                 , restrictions = restrictions
                                 , exprType = exprType
-                                , substitution = simplifySubstitution sus
+                                , substitution = simplifySubs substitution
                                 , nextFreshN = n2
                                 }
 

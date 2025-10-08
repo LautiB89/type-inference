@@ -76,7 +76,7 @@ mgu : Restrictions -> Result MguError Substitution
 mgu ys =
     case ys of
         [] ->
-            Ok (Substitution (\n -> TVar n))
+            Ok Substitution.empty
 
         ( s1, s2 ) :: xs ->
             let

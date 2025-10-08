@@ -14,6 +14,7 @@ suite =
         , varParseTest
         , absParseTest
         , appParseTest
+        , ifParseTest
         ]
 
 
@@ -101,4 +102,13 @@ appParseTest =
         , test "Parse application of abstraction to variable: (\\x.x) y" <|
             \_ ->
                 Expect.equal (parse "(\\x.x) y") (Ok (App (Abs "x" (Var "x")) (Var "y")))
+        ]
+
+
+ifParseTest : Test
+ifParseTest =
+    describe "ifParser"
+        [ test "Basic if expression: if x then y else z" <|
+            \_ ->
+                Expect.equal (parse "if x then y else z") (Ok (If (Var "x") (Var "y") (Var "z")))
         ]

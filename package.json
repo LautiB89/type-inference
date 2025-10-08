@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "elm": "^0.19.1-6",
     "elm-json": "^0.2.13",
     "elm-review": "^2.13.4",
     "elm-test": "^0.19.1-revision16",
