@@ -30,6 +30,6 @@ M ::= x
 ```
 
 
-Las variables empiezan con una minúscula y pueden contener cualquier caracter alfanumérico y `_` dentro.
+Las variables empiezan con una minúscula y pueden contener cualquier caracter alfanumérico.
 
 Además de poder usar `succ`, `pred` y `zero` para escribir `Nat`s, se puede escribir cualquier número y este se convierte a su notación correspondiente. Por ejemplo, escribir `3` da como resultado el término `succ(succ(succ(0)))`.

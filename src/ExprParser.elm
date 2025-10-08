@@ -112,7 +112,7 @@ varIdParser : Parser String
 varIdParser =
     variable
         { start = Char.isLower
-        , inner = \c -> Char.isAlphaNum c || c == '_'
+        , inner = \c -> Char.isAlphaNum c
         , reserved = Set.fromList [ "true", "false", "if", "then", "else", "zero", "succ", "pred", "isZero" ]
         }
 
