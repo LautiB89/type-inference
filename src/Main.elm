@@ -4,7 +4,7 @@ import Browser
 import Dict
 import Expr exposing (Expr, fromExpr)
 import ExprParser exposing (parse)
-import Html exposing (Html, button, div, h2, h4, text, textarea)
+import Html exposing (Html, button, div, h2, h3, h4, text, textarea)
 import Html.Attributes exposing (cols, placeholder, rows, style, value)
 import Html.Events exposing (onClick, onInput)
 import MinRectify exposing (minRectify)
@@ -435,9 +435,6 @@ view model =
 
             else
                 b
-
-        trace =
-            getTrace model.content
     in
     div
         [ style "width" "70%"
@@ -471,7 +468,7 @@ view model =
                     (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
                 ]
             ]
-        , case trace of
+        , case model.trace of
             ParsingError s ->
                 stepDiv "Ocurrió un error" [ text ("No se pudo reconocer el término " ++ s) ]
 
@@ -528,6 +525,159 @@ view model =
                             ]
                         ]
                     ]
+        , div
+            [ style "margin-top" "28px"
+            , style "display" "flex"
+            , style "flex-direction" "row"
+            , style "justify-content" "flex-end"
+            , style "gap" "6px"
+            ]
+            [ button
+                [ onClick Previous
+                , style "background"
+                    (ifShowParens "#007acc" "#eee")
+                , style "color"
+                    (ifShowParens "white" "black")
+                , style "border" "none"
+                , style "padding" "8px 16px"
+                , style "cursor" "pointer"
+                ]
+                [ text "Atrás" ]
+            , button
+                [ onClick Next
+                , style "background"
+                    (ifShowParens "#007acc" "#eee")
+                , style "color"
+                    (ifShowParens "white" "black")
+                , style "border" "none"
+                , style "padding" "8px 16px"
+                , style "cursor" "pointer"
+                ]
+                [ text "Siguiente" ]
+            ]
+        ]
+
+
+viewStep : Model -> Html Msg
+viewStep model =
+    let
+        ifShowParens a b =
+            if model.showImplicitParens then
+                a
+
+            else
+                b
+    in
+    div
+        [ style "width" "70%"
+        , style "margin" "40px auto"
+        , style "font-family" "sans-serif"
+        , style "font-size" "16px"
+        ]
+        [ h3 [] [ text "" ]
+        , div [ style "margin-bottom" "12px" ]
+            [ button
+                [ onClick ToggleImplicitParens
+                , style "background"
+                    (ifShowParens "#007acc" "#eee")
+                , style "color"
+                    (ifShowParens "white" "black")
+                , style "border" "none"
+                , style "padding" "8px 16px"
+                , style "cursor" "pointer"
+                ]
+                [ text
+                    (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
+                ]
+            ]
+        , div []
+            (case model.step of
+                WritingTerm ->
+                    [ h3 [] [ text "Escribí tu expresión" ]
+                    , textarea
+                        [ value model.content
+                        , onInput Change
+                        , placeholder "(\\x.x x) (\\y.y y)"
+                        , rows 2
+                        , cols 60
+                        , style "margin-bottom" "12px"
+                        , style "font-size" "16px"
+                        ]
+                        []
+                    , case mode.trace of
+                        ParsingError s ->
+                            stepDiv "Ocurrió un error" [ text ("No se pudo reconocer el término " ++ s) ]
+
+                        _ ->
+                            button [] [ text "Empezar" ]
+                    ]
+
+                Rectification ->
+                    [ stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
+                    ]
+
+                Annotation ->
+                    [ stepDiv "2. Anotación"
+                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.annotatedExpr) ]
+                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
+                        ]
+                    ]
+
+                MguOk t ->
+                    div []
+                        [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
+                        , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
+                        , stepDiv "2. Anotación"
+                            [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
+                            , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
+                            ]
+                        , stepDiv "3. Generación de restricciones"
+                            [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
+                            , div [] [ text ("Restricciones: " ++ fromRestrictions t.restrictions) ]
+                            ]
+                        , stepDiv "4. Unificación"
+                            [ div [] [ text ("Sustitución: " ++ fromSubstitution t.substitution t.nextFreshN) ] ]
+                        , stepDiv "Resultado"
+                            [ div []
+                                [ text
+                                    (fromContext (Dict.map (\_ t1 -> substitute t.substitution t1) t.context)
+                                        ++ (" ⊢ " ++ fromTypedExpr model.showImplicitParens (substituteExpr t.substitution t.typedExpr))
+                                        ++ (" : " ++ fromType (substitute t.substitution t.exprType))
+                                    )
+                                ]
+                            ]
+                        ]
+            )
+        , div
+            [ style "margin-top" "28px"
+            , style "display" "flex"
+            , style "flex-direction" "row"
+            , style "justify-content" "flex-end"
+            , style "gap" "6px"
+            ]
+            [ button
+                [ onClick Previous
+                , style "background"
+                    (ifShowParens "#007acc" "#eee")
+                , style "color"
+                    (ifShowParens "white" "black")
+                , style "border" "none"
+                , style "padding" "8px 16px"
+                , style "cursor" "pointer"
+                ]
+                [ text "Atrás" ]
+            , button
+                [ onClick Next
+                , style "background"
+                    (ifShowParens "#007acc" "#eee")
+                , style "color"
+                    (ifShowParens "white" "black")
+                , style "border" "none"
+                , style "padding" "8px 16px"
+                , style "cursor" "pointer"
+                ]
+                [ text "Siguiente" ]
+            ]
         ]
 
 
