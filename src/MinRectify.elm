@@ -52,7 +52,7 @@ renameVar oldId newId =
 
 
 rectifyHelper : Expr -> Set Id -> Multiset Id -> ( Expr, Multiset Id )
-rectifyHelper e freeVars boundedVars =
+rectifyHelper e freeVars boundVars =
     let
         isFreeVar : Id -> Bool
         isFreeVar vId =
@@ -64,12 +64,12 @@ rectifyHelper e freeVars boundedVars =
     in
     case e of
         Var id ->
-            ( Var id, boundedVars )
+            ( Var id, boundVars )
 
         Abs id expr ->
-            if Multiset.count id boundedVars == 1 && not (isFreeVar id) then
-                rectifyHelper expr freeVars boundedVars
-                    |> Tuple.mapFirst (Abs id)
+            if Multiset.count id boundVars == 1 && not (isFreeVar id) then
+                Tuple.mapFirst (Abs id) <|
+                    rectifyHelper expr freeVars boundVars
 
             else
                 let
@@ -79,13 +79,17 @@ rectifyHelper e freeVars boundedVars =
                     newId =
                         id
                             ++ fromInt
-                                (until (\nId -> not (isFreeVar (getId nId)) && not (Multiset.member (getId nId) boundedVars)) (\nId -> nId + 1) 1)
+                                (until
+                                    (\nId -> not (isFreeVar (getId nId)) && not (Multiset.member (getId nId) boundVars))
+                                    (\nId -> nId + 1)
+                                    1
+                                )
 
                     newFvs =
                         Set.insert newId freeVars
 
                     newBvs =
-                        Multiset.remove id boundedVars
+                        Multiset.remove id boundVars
                             |> Multiset.insert newId
 
                     ( renamedExpr, bvs ) =
@@ -96,7 +100,7 @@ rectifyHelper e freeVars boundedVars =
         App e1 e2 ->
             let
                 ( ne1, bv1 ) =
-                    rec e1 boundedVars
+                    rec e1 boundVars
 
                 ( ne2, bv2 ) =
                     rec e2 bv1
@@ -110,21 +114,21 @@ rectifyHelper e freeVars boundedVars =
             ( ConstFalse, Multiset.empty )
 
         IsZero expr ->
-            Tuple.mapFirst IsZero (rectifyHelper expr freeVars boundedVars)
+            Tuple.mapFirst IsZero (rectifyHelper expr freeVars boundVars)
 
         ConstZero ->
             ( ConstZero, Multiset.empty )
 
         Succ expr ->
-            Tuple.mapFirst Succ (rectifyHelper expr freeVars boundedVars)
+            Tuple.mapFirst Succ (rectifyHelper expr freeVars boundVars)
 
         Pred expr ->
-            Tuple.mapFirst Pred (rectifyHelper expr freeVars boundedVars)
+            Tuple.mapFirst Pred (rectifyHelper expr freeVars boundVars)
 
         If expr1 expr2 expr3 ->
             let
                 ( ne1, bv1 ) =
-                    rec expr1 boundedVars
+                    rec expr1 boundVars
 
                 ( ne2, bv2 ) =
                     rec expr2 bv1
@@ -141,5 +145,5 @@ minRectify e =
         ( fv, bv ) =
             freeAndBoundVars e
     in
-    rectifyHelper e fv bv
-        |> Tuple.first
+    Tuple.first <|
+        rectifyHelper e fv bv
