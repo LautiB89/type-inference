@@ -47,16 +47,71 @@ main =
 -- MODEL
 
 
+type State
+    = Initial String
+    | ParseErr String
+    | ParseOk { input : String, parsedExpr : Expr }
+    | Rectified { input : String, parsedExpr : Expr, rectExpr : Expr }
+    | Annotated
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , nextFreshN : Int
+        }
+    | InferErr
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , nextFreshN : Int
+        }
+    | InferOk
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , exprType : Type
+        , restrictions : Restrictions
+        , nextFreshN : Int
+        }
+    | UnificationErr
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , exprType : Type
+        , restrictions : Restrictions
+        , mguError : MguError
+        , nextFreshN : Int
+        }
+    | UnificationOk
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , exprType : Type
+        , restrictions : Restrictions
+        , substitution : Substitution
+        , nextFreshN : Int
+        }
+
+
 type alias Model =
-    { content : String
-    , showImplicitParens : Bool
+    { showImplicitParens : Bool
+    , state : State
     }
 
 
 init : Model
 init =
-    { content = ""
-    , showImplicitParens = False
+    { showImplicitParens = False
+    , state = Initial ""
     }
 
 
@@ -67,16 +122,193 @@ init =
 type Msg
     = Change String
     | ToggleImplicitParens
+    | Reset
+    | Previous
+    | Next
+
+
+next : State -> State
+next step =
+    case step of
+        Initial input ->
+            parse input
+                |> Result.map (\expr -> ParseOk { input = input, parsedExpr = expr })
+                |> Result.withDefault (ParseErr input)
+
+        ParseErr input ->
+            ParseErr input
+
+        ParseOk { input, parsedExpr } ->
+            Rectified
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = minRectify parsedExpr
+                }
+
+        Rectified { input, parsedExpr, rectExpr } ->
+            let
+                ( context, annotatedExpr, nextFreshN ) =
+                    decorate rectExpr
+            in
+            Annotated
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                , context = context
+                , annotatedExpr = annotatedExpr
+                , nextFreshN = nextFreshN
+                }
+
+        Annotated data ->
+            let
+                ( maybeRes, nextFreshN ) =
+                    infer data.context data.annotatedExpr data.nextFreshN
+            in
+            case maybeRes of
+                Just ( exprType, restrictions ) ->
+                    InferOk
+                        { input = data.input
+                        , parsedExpr = data.parsedExpr
+                        , rectExpr = data.rectExpr
+                        , context = data.context
+                        , annotatedExpr = data.annotatedExpr
+                        , exprType = exprType
+                        , restrictions = restrictions
+                        , nextFreshN = nextFreshN
+                        }
+
+                Nothing ->
+                    InferErr
+                        { input = data.input
+                        , parsedExpr = data.parsedExpr
+                        , rectExpr = data.rectExpr
+                        , context = data.context
+                        , annotatedExpr = data.annotatedExpr
+                        , nextFreshN = nextFreshN
+                        }
+
+        InferErr data ->
+            InferErr data
+
+        InferOk data ->
+            let
+                mguRes =
+                    mgu data.restrictions
+            in
+            case mguRes of
+                Ok substitution ->
+                    UnificationOk
+                        { input = data.input
+                        , parsedExpr = data.parsedExpr
+                        , rectExpr = data.rectExpr
+                        , context = data.context
+                        , annotatedExpr = data.annotatedExpr
+                        , exprType = data.exprType
+                        , restrictions = data.restrictions
+                        , nextFreshN = data.nextFreshN
+                        , substitution = substitution
+                        }
+
+                Err mguErr ->
+                    UnificationErr
+                        { input = data.input
+                        , parsedExpr = data.parsedExpr
+                        , rectExpr = data.rectExpr
+                        , context = data.context
+                        , annotatedExpr = data.annotatedExpr
+                        , exprType = data.exprType
+                        , restrictions = data.restrictions
+                        , nextFreshN = data.nextFreshN
+                        , mguError = mguErr
+                        }
+
+        UnificationErr e ->
+            UnificationErr e
+
+        UnificationOk data ->
+            UnificationOk data
+
+
+previous : State -> State
+previous step =
+    case step of
+        Initial _ ->
+            step
+
+        ParseErr input ->
+            Initial input
+
+        ParseOk { input } ->
+            Initial input
+
+        Rectified { input, parsedExpr } ->
+            ParseOk { input = input, parsedExpr = parsedExpr }
+
+        Annotated { input, parsedExpr, rectExpr } ->
+            Rectified { input = input, parsedExpr = parsedExpr, rectExpr = rectExpr }
+
+        InferErr { input, parsedExpr, rectExpr, context, annotatedExpr, nextFreshN } ->
+            Annotated
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                , context = context
+                , annotatedExpr = annotatedExpr
+                , nextFreshN = nextFreshN
+                }
+
+        InferOk { input, parsedExpr, rectExpr, context, annotatedExpr, nextFreshN } ->
+            Annotated
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                , context = context
+                , annotatedExpr = annotatedExpr
+                , nextFreshN = nextFreshN
+                }
+
+        UnificationErr { input, parsedExpr, rectExpr, context, annotatedExpr, exprType, restrictions, nextFreshN } ->
+            InferOk
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                , context = context
+                , annotatedExpr = annotatedExpr
+                , exprType = exprType
+                , restrictions = restrictions
+                , nextFreshN = nextFreshN
+                }
+
+        UnificationOk { input, parsedExpr, rectExpr, context, annotatedExpr, exprType, restrictions, nextFreshN } ->
+            InferOk
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                , context = context
+                , annotatedExpr = annotatedExpr
+                , exprType = exprType
+                , restrictions = restrictions
+                , nextFreshN = nextFreshN
+                }
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
         Change newContent ->
-            { model | content = newContent }
+            { content = newContent, state = next (Initial newContent) }
 
         ToggleImplicitParens ->
             { model | showImplicitParens = not model.showImplicitParens }
+
+        Reset ->
+            { model | state = Initial "" }
+
+        Next ->
+            { model | state = next model.state }
+
+        Previous ->
+            { model | state = previous model.state }
 
 
 
