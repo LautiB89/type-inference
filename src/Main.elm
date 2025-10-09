@@ -4,8 +4,8 @@ import Browser
 import Dict
 import Expr exposing (Expr, fromExpr)
 import ExprParser exposing (parse)
-import Html exposing (Html, button, div, h2, h4, text, textarea)
-import Html.Attributes exposing (cols, placeholder, rows, style, value)
+import Html exposing (Html, button, div, h2, h4, input, label, text, textarea)
+import Html.Attributes exposing (cols, for, id, placeholder, rows, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import MinRectify exposing (minRectify)
 import Restrictions
@@ -224,20 +224,16 @@ view model =
             , style "font-size" "16px"
             ]
             []
-        , div [ style "margin-bottom" "12px" ]
-            [ button
+        , div []
+            [ input
                 [ onClick ToggleImplicitParens
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
+                , id "toggleParens"
+                , type_ "checkbox"
                 ]
-                [ text
-                    (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
-                ]
+                []
+            , label
+                [ for "toggleParens" ]
+                [ text "Mostrar paréntesis implícitos" ]
             ]
         , case trace of
             ParsingError s ->
