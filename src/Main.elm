@@ -10,6 +10,7 @@ import MinRectify exposing (minRectify)
 import Restrictions
     exposing
         ( MguError
+        , Restriction
         , Restrictions
         , fromMguError
         , fromRestrictions
@@ -46,7 +47,7 @@ main =
 -- MODEL
 
 
-type State2
+type State
     = Parse String
     | Rectify
         { input : String
@@ -77,61 +78,6 @@ type State2
         }
 
 
-type State
-    = Initial String
-    | ParseErr String
-    | ParseOk { input : String, parsedExpr : Expr }
-    | Rectified { input : String, parsedExpr : Expr, rectExpr : Expr }
-    | Annotated
-        { input : String
-        , parsedExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , nextFreshN : Int
-        }
-    | InferErr
-        { input : String
-        , parsedExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , nextFreshN : Int
-        }
-    | InferOk
-        { input : String
-        , parsedExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , exprType : Type
-        , restrictions : Restrictions
-        , nextFreshN : Int
-        }
-    | UnificationErr
-        { input : String
-        , parsedExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , exprType : Type
-        , restrictions : Restrictions
-        , mguError : MguError
-        , nextFreshN : Int
-        }
-    | UnificationOk
-        { input : String
-        , parsedExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , exprType : Type
-        , restrictions : Restrictions
-        , substitution : Substitution
-        , nextFreshN : Int
-        }
-
-
 type alias Model =
     { showImplicitParens : Bool
     , state : State
@@ -141,7 +87,7 @@ type alias Model =
 init : Model
 init =
     { showImplicitParens = False
-    , state = Initial ""
+    , state = Parse ""
     }
 
 
@@ -160,27 +106,27 @@ type Msg
 next : State -> State
 next step =
     case step of
-        Initial input ->
-            parse input
-                |> Result.map (\expr -> ParseOk { input = input, parsedExpr = expr })
-                |> Result.withDefault (ParseErr input)
+        Parse input ->
+            case parse input of
+                Err _ ->
+                    Parse input
 
-        ParseErr input ->
-            ParseErr input
+                Ok parsedExpr ->
+                    Rectify { input = input, parsedExpr = parsedExpr }
 
-        ParseOk { input, parsedExpr } ->
-            Rectified
+        Rectify { input, parsedExpr } ->
+            Annotate
                 { input = input
                 , parsedExpr = parsedExpr
                 , rectExpr = minRectify parsedExpr
                 }
 
-        Rectified { input, parsedExpr, rectExpr } ->
+        Annotate { input, parsedExpr, rectExpr } ->
             let
                 ( context, annotatedExpr, nextFreshN ) =
                     decorate rectExpr
             in
-            Annotated
+            Infer
                 { input = input
                 , parsedExpr = parsedExpr
                 , rectExpr = rectExpr
@@ -189,137 +135,48 @@ next step =
                 , nextFreshN = nextFreshN
                 }
 
-        Annotated data ->
+        Infer { input, parsedExpr, rectExpr, context, annotatedExpr, nextFreshN } ->
             let
-                ( maybeRes, nextFreshN ) =
-                    infer data.context data.annotatedExpr data.nextFreshN
+                ( maybeRes, nextFreshN2 ) =
+                    infer context annotatedExpr nextFreshN
             in
             case maybeRes of
+                Nothing ->
+                    step
+
                 Just ( exprType, restrictions ) ->
-                    InferOk
-                        { input = data.input
-                        , parsedExpr = data.parsedExpr
-                        , rectExpr = data.rectExpr
-                        , context = data.context
-                        , annotatedExpr = data.annotatedExpr
+                    Unify
+                        { input = input
+                        , parsedExpr = parsedExpr
+                        , rectExpr = rectExpr
+                        , context = context
+                        , annotatedExpr = annotatedExpr
                         , exprType = exprType
                         , restrictions = restrictions
-                        , nextFreshN = nextFreshN
+                        , nextFreshN = nextFreshN2
                         }
 
-                Nothing ->
-                    InferErr
-                        { input = data.input
-                        , parsedExpr = data.parsedExpr
-                        , rectExpr = data.rectExpr
-                        , context = data.context
-                        , annotatedExpr = data.annotatedExpr
-                        , nextFreshN = nextFreshN
-                        }
-
-        InferErr data ->
-            InferErr data
-
-        InferOk data ->
-            let
-                mguRes =
-                    mgu data.restrictions
-            in
-            case mguRes of
-                Ok substitution ->
-                    UnificationOk
-                        { input = data.input
-                        , parsedExpr = data.parsedExpr
-                        , rectExpr = data.rectExpr
-                        , context = data.context
-                        , annotatedExpr = data.annotatedExpr
-                        , exprType = data.exprType
-                        , restrictions = data.restrictions
-                        , nextFreshN = data.nextFreshN
-                        , substitution = simplifySubs substitution
-                        }
-
-                Err mguErr ->
-                    UnificationErr
-                        { input = data.input
-                        , parsedExpr = data.parsedExpr
-                        , rectExpr = data.rectExpr
-                        , context = data.context
-                        , annotatedExpr = data.annotatedExpr
-                        , exprType = data.exprType
-                        , restrictions = data.restrictions
-                        , nextFreshN = data.nextFreshN
-                        , mguError = mguErr
-                        }
-
-        UnificationErr e ->
-            UnificationErr e
-
-        UnificationOk data ->
-            UnificationOk data
+        Unify _ ->
+            step
 
 
 previous : State -> State
 previous step =
     case step of
-        Initial _ ->
+        Parse _ ->
             step
 
-        ParseErr input ->
-            Initial input
+        Rectify { input } ->
+            Parse input
 
-        ParseOk { input } ->
-            Initial input
+        Annotate data ->
+            Rectify data
 
-        Rectified { input, parsedExpr } ->
-            ParseOk { input = input, parsedExpr = parsedExpr }
+        Infer data ->
+            Annotate data
 
-        Annotated { input, parsedExpr, rectExpr } ->
-            Rectified { input = input, parsedExpr = parsedExpr, rectExpr = rectExpr }
-
-        InferErr { input, parsedExpr, rectExpr, context, annotatedExpr, nextFreshN } ->
-            Annotated
-                { input = input
-                , parsedExpr = parsedExpr
-                , rectExpr = rectExpr
-                , context = context
-                , annotatedExpr = annotatedExpr
-                , nextFreshN = nextFreshN
-                }
-
-        InferOk { input, parsedExpr, rectExpr, context, annotatedExpr, nextFreshN } ->
-            Annotated
-                { input = input
-                , parsedExpr = parsedExpr
-                , rectExpr = rectExpr
-                , context = context
-                , annotatedExpr = annotatedExpr
-                , nextFreshN = nextFreshN
-                }
-
-        UnificationErr { input, parsedExpr, rectExpr, context, annotatedExpr, exprType, restrictions, nextFreshN } ->
-            InferOk
-                { input = input
-                , parsedExpr = parsedExpr
-                , rectExpr = rectExpr
-                , context = context
-                , annotatedExpr = annotatedExpr
-                , exprType = exprType
-                , restrictions = restrictions
-                , nextFreshN = nextFreshN
-                }
-
-        UnificationOk { input, parsedExpr, rectExpr, context, annotatedExpr, exprType, restrictions, nextFreshN } ->
-            InferOk
-                { input = input
-                , parsedExpr = parsedExpr
-                , rectExpr = rectExpr
-                , context = context
-                , annotatedExpr = annotatedExpr
-                , exprType = exprType
-                , restrictions = restrictions
-                , nextFreshN = nextFreshN
-                }
+        Unify data ->
+            Infer data
 
 
 update : Msg -> Model -> Model
@@ -589,7 +446,7 @@ viewStep2 model state =
                                     ]
                        )
 
-            Rectify { input, parsedExpr } ->
+            Rectify { parsedExpr } ->
                 [ h3 [] [ text "1. Rectificar el término" ]
                 , text "Decimos que un término está rectificado si:"
                 , ul [ style "margin" "2px" ]
@@ -598,16 +455,20 @@ viewStep2 model state =
                     ]
                 , div [ style "margin-bottom" "12px" ] [ text "Siempre podemos rectificar un término a través de alpha-renombres." ]
                 , text "Término inicial"
-                , stepDiv [ text <| fromExpr model.showImplicitParens data.parsedExpr ]
+                , stepDiv [ text <| fromExpr model.showImplicitParens parsedExpr ]
                 , div [ style "margin-top" "12px" ] [ text "Término rectificado" ]
-                , stepDiv [ text <| fromExpr model.showImplicitParens data.rectExpr ]
+                , stepDiv [ text <| fromExpr model.showImplicitParens (minRectify parsedExpr) ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
                     , stepStateButton "Siguiente" Next
                     ]
                 ]
 
-            Annotated data ->
+            Annotate { rectExpr } ->
+                let
+                    ( context, annotatedExpr, _ ) =
+                        decorate rectExpr
+                in
                 [ h3 [] [ text "2. Anotar el término" ]
                 , text "Producimos un contexto Γ₀ y un término M₀"
                 , ul [ style "margin" "2px" ]
@@ -619,8 +480,8 @@ viewStep2 model state =
                     ]
                 , text "Resultado"
                 , stepDiv
-                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
-                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
+                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens annotatedExpr ]
+                    , div [] [ text <| "Γ₀ = " ++ fromContext context ]
                     ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
@@ -628,81 +489,93 @@ viewStep2 model state =
                     ]
                 ]
 
-            InferErr _ ->
-                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
-                , text "Ocurrió un error inesperado al generar las restricciones."
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Volver a empezar" Reset
-                    ]
-                ]
+            Infer { context, annotatedExpr, nextFreshN } ->
+                let
+                    maybeRes =
+                        Tuple.first <| infer context annotatedExpr nextFreshN
+                in
+                case maybeRes of
+                    Nothing ->
+                        [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                        , text "Ocurrió un error inesperado al generar las restricciones."
+                        , stepFooter
+                            [ stepStateButton "Atrás" Previous
+                            , stepStateButton "Volver a empezar" Reset
+                            ]
+                        ]
 
-            InferOk data ->
-                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
-                , text "Entrada"
-                , stepDiv
-                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
-                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
-                    ]
-                , text "Resultado"
-                , stepDiv
-                    [ div [] [ text <| "τ = " ++ fromType data.exprType ]
-                    , div [] [ text <| "E = " ++ fromRestrictions data.restrictions ]
-                    ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Siguiente" Next
-                    ]
-                ]
+                    Just ( exprType, restrictions ) ->
+                        [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                        , text "Entrada"
+                        , stepDiv
+                            [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens annotatedExpr ]
+                            , div [] [ text <| "Γ₀ = " ++ fromContext context ]
+                            ]
+                        , text "Resultado"
+                        , stepDiv
+                            [ div [] [ text <| "τ = " ++ fromType exprType ]
+                            , div [] [ text <| "E = " ++ fromRestrictions restrictions ]
+                            ]
+                        , stepFooter
+                            [ stepStateButton "Atrás" Previous
+                            , stepStateButton "Siguiente" Next
+                            ]
+                        ]
 
-            UnificationErr data ->
-                [ h3 [] [ text "4. Unificación" ]
-                , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
-                , ol [ style "margin" "2px" ]
-                    [ li [] [ text "Calculamos S = mgu(E)." ]
-                    , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
-                    , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
-                    ]
-                , div [] [ text "Resultado" ]
-                , div []
-                    [ text "El algoritmo de unificación falla con "
-                    , text <| fromMguError data.mguError ++ "."
-                    ]
-                , div [] [ text "Por lo tanto, el término no es tipable." ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Volver a empezar" Reset
-                    ]
-                ]
+            Unify { annotatedExpr, exprType, restrictions, nextFreshN, context } ->
+                let
+                    mguRes =
+                        mgu restrictions
+                in
+                case mguRes of
+                    Err mguError ->
+                        [ h3 [] [ text "4. Unificación" ]
+                        , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
+                        , ol [ style "margin" "2px" ]
+                            [ li [] [ text "Calculamos S = mgu(E)." ]
+                            , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
+                            , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
+                            ]
+                        , div [] [ text "Resultado" ]
+                        , div []
+                            [ text "El algoritmo de unificación falla con "
+                            , text <| fromMguError mguError ++ "."
+                            ]
+                        , div [] [ text "Por lo tanto, el término no es tipable." ]
+                        , stepFooter
+                            [ stepStateButton "Atrás" Previous
+                            , stepStateButton "Volver a empezar" Reset
+                            ]
+                        ]
 
-            UnificationOk data ->
-                [ h3 [] [ text "4. Unificación" ]
-                , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
-                , ol [ style "margin" "2px" ]
-                    [ li [] [ text "Calculamos S = mgu(E)." ]
-                    , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
-                    , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
-                    ]
-                , div [] [ text "Resultado" ]
-                , stepDiv
-                    [ text <| "S = MGU(E) = " ++ fromSubstitution data.substitution data.nextFreshN
-                    ]
-                , div
-                    [ style "margin-top" "16px", style "margin-bottom" "8px" ]
-                    [ text "Por lo tanto, el término es tipable y su juicio más general es" ]
-                , stepDiv
-                    [ text <|
-                        fromContext data.context
-                            ++ " ⊢ "
-                            ++ fromTypedExpr model.showImplicitParens (substituteExpr data.substitution data.annotatedExpr)
-                            ++ " : "
-                            ++ fromType data.exprType
-                    ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Volver a empezar" Reset
-                    ]
-                ]
+                    Ok substitution ->
+                        [ h3 [] [ text "4. Unificación" ]
+                        , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
+                        , ol [ style "margin" "2px" ]
+                            [ li [] [ text "Calculamos S = mgu(E)." ]
+                            , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
+                            , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
+                            ]
+                        , div [] [ text "Resultado" ]
+                        , stepDiv
+                            [ text <| "S = MGU(E) = " ++ fromSubstitution substitution nextFreshN
+                            ]
+                        , div
+                            [ style "margin-top" "16px", style "margin-bottom" "8px" ]
+                            [ text "Por lo tanto, el término es tipable y su juicio más general es" ]
+                        , stepDiv
+                            [ text <|
+                                fromContext context
+                                    ++ " ⊢ "
+                                    ++ fromTypedExpr model.showImplicitParens (substituteExpr substitution annotatedExpr)
+                                    ++ " : "
+                                    ++ fromType exprType
+                            ]
+                        , stepFooter
+                            [ stepStateButton "Atrás" Previous
+                            , stepStateButton "Volver a empezar" Reset
+                            ]
+                        ]
         )
 
 
