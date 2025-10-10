@@ -46,6 +46,37 @@ main =
 -- MODEL
 
 
+type State2
+    = Parse String
+    | Rectify
+        { input : String
+        , parsedExpr : Expr
+        }
+    | Annotate
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        }
+    | Infer
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , nextFreshN : Int
+        }
+    | Unify
+        { input : String
+        , parsedExpr : Expr
+        , rectExpr : Expr
+        , context : Context
+        , annotatedExpr : TypedExpr
+        , exprType : Type
+        , restrictions : Restrictions
+        , nextFreshN : Int
+        }
+
+
 type State
     = Initial String
     | ParseErr String
@@ -412,6 +443,153 @@ viewStep model =
                 ]
 
             Rectified data ->
+                [ h3 [] [ text "1. Rectificar el término" ]
+                , text "Decimos que un término está rectificado si:"
+                , ul [ style "margin" "2px" ]
+                    [ li [] [ text "No hay dos variables ligadas con el mismo nombre." ]
+                    , li [] [ text "No hay una variable ligada con el mismo nombre que una variable libre." ]
+                    ]
+                , div [ style "margin-bottom" "12px" ] [ text "Siempre podemos rectificar un término a través de alpha-renombres." ]
+                , text "Término inicial"
+                , stepDiv [ text <| fromExpr model.showImplicitParens data.parsedExpr ]
+                , div [ style "margin-top" "12px" ] [ text "Término rectificado" ]
+                , stepDiv [ text <| fromExpr model.showImplicitParens data.rectExpr ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
+
+            Annotated data ->
+                [ h3 [] [ text "2. Anotar el término" ]
+                , text "Producimos un contexto Γ₀ y un término M₀"
+                , ul [ style "margin" "2px" ]
+                    [ li [] [ text "El contexto Γ₀ le da tipo a todas las variables libres de U." ]
+                    , li [] [ text "El término M₀ está anotado de tal modo que Erase(M₀) = U." ]
+                    ]
+                , div [ style "margin-bottom" "12px" ]
+                    [ text "Todos los tipos y las anotaciones que se agregan son incógnitas frescas."
+                    ]
+                , text "Resultado"
+                , stepDiv
+                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
+                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
+                    ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
+
+            InferErr _ ->
+                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                , text "Ocurrió un error inesperado al generar las restricciones."
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Volver a empezar" Reset
+                    ]
+                ]
+
+            InferOk data ->
+                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                , text "Entrada"
+                , stepDiv
+                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
+                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
+                    ]
+                , text "Resultado"
+                , stepDiv
+                    [ div [] [ text <| "τ = " ++ fromType data.exprType ]
+                    , div [] [ text <| "E = " ++ fromRestrictions data.restrictions ]
+                    ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
+
+            UnificationErr data ->
+                [ h3 [] [ text "4. Unificación" ]
+                , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
+                , ol [ style "margin" "2px" ]
+                    [ li [] [ text "Calculamos S = mgu(E)." ]
+                    , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
+                    , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
+                    ]
+                , div [] [ text "Resultado" ]
+                , div []
+                    [ text "El algoritmo de unificación falla con "
+                    , text <| fromMguError data.mguError ++ "."
+                    ]
+                , div [] [ text "Por lo tanto, el término no es tipable." ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Volver a empezar" Reset
+                    ]
+                ]
+
+            UnificationOk data ->
+                [ h3 [] [ text "4. Unificación" ]
+                , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
+                , ol [ style "margin" "2px" ]
+                    [ li [] [ text "Calculamos S = mgu(E)." ]
+                    , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
+                    , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
+                    ]
+                , div [] [ text "Resultado" ]
+                , stepDiv
+                    [ text <| "S = MGU(E) = " ++ fromSubstitution data.substitution data.nextFreshN
+                    ]
+                , div
+                    [ style "margin-top" "16px", style "margin-bottom" "8px" ]
+                    [ text "Por lo tanto, el término es tipable y su juicio más general es" ]
+                , stepDiv
+                    [ text <|
+                        fromContext data.context
+                            ++ " ⊢ "
+                            ++ fromTypedExpr model.showImplicitParens (substituteExpr data.substitution data.annotatedExpr)
+                            ++ " : "
+                            ++ fromType data.exprType
+                    ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Volver a empezar" Reset
+                    ]
+                ]
+        )
+
+
+viewStep2 : Model -> State2 -> Html Msg
+viewStep2 model state =
+    div
+        [ style "display" "flex"
+        , style "flex-direction" "column"
+        ]
+        (case state of
+            Parse input ->
+                let
+                    parseResult =
+                        parse input
+                in
+                [ h3 [] [ text "Escribí tu expresión" ]
+                , exprTextArea input
+                ]
+                    ++ (if String.isEmpty input then
+                            []
+
+                        else
+                            case parseResult of
+                                Err _ ->
+                                    [ span [] [ text "No se puede reconocer a qué término se corresponde." ] ]
+
+                                Ok parsedExpr ->
+                                    [ text "El término es"
+                                    , stepDiv [ text <| fromExpr model.showImplicitParens parsedExpr ]
+                                    , stepFooter [ stepStateButton "Empezar" Next ]
+                                    ]
+                       )
+
+            Rectify { input, parsedExpr } ->
                 [ h3 [] [ text "1. Rectificar el término" ]
                 , text "Decimos que un término está rectificado si:"
                 , ul [ style "margin" "2px" ]
