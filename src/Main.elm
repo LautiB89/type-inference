@@ -3,8 +3,8 @@ module Main exposing (Model, Msg(..), main)
 import Browser
 import Expr exposing (Expr, fromExpr)
 import ExprParser exposing (parse)
-import Html exposing (Html, button, div, h2, h3, h4, p, span, text, textarea)
-import Html.Attributes exposing (cols, rows, style, value)
+import Html exposing (Html, button, div, h2, h3, h4, input, label, p, span, text, textarea)
+import Html.Attributes exposing (cols, for, id, rows, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import MinRectify exposing (minRectify)
 import Restrictions
@@ -314,33 +314,19 @@ update msg model =
 -- VIEW
 
 
-stepDiv : String -> List (Html Msg) -> Html Msg
-stepDiv title xs =
-    div []
-        [ h4 [] [ text title ]
-        , div
-            [ style "background" "#f9f9f9"
-            , style "padding" "4px"
-            , style "border-radius" "4px"
-            , style "min-height" "40px"
-            , style "font-family" "monospace"
-            , style "display" "flex"
-            , style "flex-direction" "column"
-            ]
-            xs
+stepDiv : List (Html Msg) -> Html Msg
+stepDiv xs =
+    div
+        [ style "background" "#f9f9f9"
+        , style "padding" "4px"
+        , style "border-radius" "8px"
+        , style "font-family" "monospace"
         ]
+        xs
 
 
 view : Model -> Html Msg
 view model =
-    let
-        ifShowParens a b =
-            if model.showImplicitParens then
-                a
-
-            else
-                b
-    in
     div
         [ style "width" "70%"
         , style "margin" "40px auto"
@@ -348,20 +334,16 @@ view model =
         , style "font-size" "16px"
         ]
         [ h2 [] [ text "Algoritmo I" ]
-        , div [ style "margin-bottom" "12px" ]
-            [ button
+        , div []
+            [ input
                 [ onClick ToggleImplicitParens
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
+                , id "toggleParens"
+                , type_ "checkbox"
                 ]
-                [ text
-                    (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
-                ]
+                []
+            , label
+                [ for "toggleParens" ]
+                [ text "Mostrar paréntesis implícitos" ]
             ]
         , viewStep model
         ]
@@ -431,14 +413,10 @@ viewStep model =
                 [ h3 [] [ text "1. Rectificar el término" ]
                 , p [] [ text "Alguna explicación" ]
                 , div []
-                    [ text <|
-                        "El término inicial es "
-                            ++ fromExpr model.showImplicitParens data.parsedExpr
-                    ]
-                , div []
-                    [ text <|
-                        "El término rectificado es "
-                            ++ fromExpr model.showImplicitParens data.rectExpr
+                    [ text "Término inicial"
+                    , stepDiv [ text <| fromExpr model.showImplicitParens data.parsedExpr ]
+                    , div [ style "margin-top" "12px" ] [ text "Término rectificado" ]
+                    , stepDiv [ text <| fromExpr model.showImplicitParens data.rectExpr ]
                     ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
@@ -449,9 +427,9 @@ viewStep model =
             Annotated data ->
                 [ h3 [] [ text "2. Anotar el término" ]
                 , p [] [ text "Alguna explicación" ]
-                , div []
-                    [ text "Resultado "
-                    , div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
+                , text "Resultado"
+                , stepDiv
+                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
                     , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
                     ]
                 , stepFooter
@@ -472,9 +450,9 @@ viewStep model =
             InferOk data ->
                 [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
                 , p [] [ text "Alguna explicación" ]
-                , div []
-                    [ text "Resultado "
-                    , div [] [ text <| "τ = " ++ fromType data.exprType ]
+                , text "Resultado"
+                , stepDiv
+                    [ div [] [ text <| "τ = " ++ fromType data.exprType ]
                     , div [] [ text <| "E = " ++ fromRestrictions data.restrictions ]
                     ]
                 , stepFooter
@@ -485,7 +463,7 @@ viewStep model =
 
             UnificationErr data ->
                 [ h3 [] [ text "4. Unificación" ]
-                , p [] [ text (fromMguError data.mguError) ]
+                , stepDiv [ text (fromMguError data.mguError) ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
                     , stepStateButton "Siguiente" Next
@@ -495,18 +473,21 @@ viewStep model =
             UnificationOk data ->
                 [ h3 [] [ text "4. Unificación" ]
                 , p [] [ text "Alguna explicación" ]
-                , div []
-                    [ div []
-                        [ text <| "S = MGU(E) = " ++ fromSubstitution data.substitution data.nextFreshN ]
-                    , div [] [ text "Resultado final" ]
-                    , div []
-                        [ text <|
-                            fromContext data.context
-                                ++ "⊢"
-                                ++ fromTypedExpr model.showImplicitParens (substituteExpr data.substitution data.annotatedExpr)
-                                ++ ": "
-                                ++ fromType data.exprType
-                        ]
+                , stepDiv
+                    [ text <| "S = MGU(E) = " ++ fromSubstitution data.substitution data.nextFreshN
+                    ]
+                , div
+                    [ style "margin-top" "16px"
+                    , style "margin-bottom" "8px"
+                    ]
+                    [ text "Resultado final" ]
+                , stepDiv
+                    [ text <|
+                        fromContext data.context
+                            ++ " ⊢ "
+                            ++ fromTypedExpr model.showImplicitParens (substituteExpr data.substitution data.annotatedExpr)
+                            ++ " : "
+                            ++ fromType data.exprType
                     ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
