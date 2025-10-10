@@ -400,12 +400,14 @@ viewStep model =
             ParseErr input ->
                 [ h3 [] [ text "Escribí tu expresión" ]
                 , exprTextArea input
-                , span [] [ text "Error" ]
+                , span [] [ text "No se puede reconocer a qué término se corresponde." ]
                 ]
 
             ParseOk data ->
                 [ h3 [] [ text "Escribí tu expresión" ]
                 , exprTextArea data.input
+                , text "El término es"
+                , stepDiv [ text <| fromExpr model.showImplicitParens data.parsedExpr ]
                 , stepFooter [ stepStateButton "Empezar" Next ]
                 ]
 
