@@ -1,11 +1,10 @@
 module Main exposing (Model, Msg(..), main)
 
 import Browser
-import Dict
 import Expr exposing (Expr, fromExpr)
 import ExprParser exposing (parse)
-import Html exposing (Html, button, div, h2, h3, h4, text, textarea)
-import Html.Attributes exposing (cols, placeholder, rows, style, value)
+import Html exposing (Html, button, div, h2, h3, h4, p, span, text, textarea)
+import Html.Attributes exposing (cols, rows, style, value)
 import Html.Events exposing (onClick, onInput)
 import MinRectify exposing (minRectify)
 import Restrictions
@@ -206,7 +205,7 @@ next step =
                         , exprType = data.exprType
                         , restrictions = data.restrictions
                         , nextFreshN = data.nextFreshN
-                        , substitution = substitution
+                        , substitution = simplifySubs substitution
                         }
 
                 Err mguErr ->
@@ -295,8 +294,8 @@ previous step =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        Change newContent ->
-            { content = newContent, state = next (Initial newContent) }
+        Change newInput ->
+            { model | state = next (Initial newInput) }
 
         ToggleImplicitParens ->
             { model | showImplicitParens = not model.showImplicitParens }
@@ -332,100 +331,6 @@ stepDiv title xs =
         ]
 
 
-type Trace
-    = ParsingError String
-    | InferError
-        { inputStr : String
-        , plainExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , nextFreshN : Int
-        }
-    | MguFailed
-        MguError
-        { inputStr : String
-        , plainExpr : Expr
-        , rectExpr : Expr
-        , context : Context
-        , annotatedExpr : TypedExpr
-        , restrictions : Restrictions
-        , exprType : Type
-        , nextFreshN : Int
-        }
-    | MguOk
-        { inputStr : String
-        , rectExpr : Expr
-        , plainExpr : Expr
-        , typedExpr : TypedExpr
-        , context : Context
-        , restrictions : Restrictions
-        , exprType : Type
-        , substitution : Substitution
-        , nextFreshN : Int
-        }
-
-
-getTrace : String -> Trace
-getTrace s =
-    case parse s of
-        Err _ ->
-            ParsingError s
-
-        Ok parsedExpr ->
-            let
-                rectified : Expr
-                rectified =
-                    minRectify parsedExpr
-
-                ( context, annotated, n1 ) =
-                    decorate rectified
-
-                ( may, n2 ) =
-                    infer context annotated n1
-
-                okInferResult =
-                    { inputStr = s
-                    , plainExpr = parsedExpr
-                    , rectExpr = rectified
-                    , context = context
-                    , annotatedExpr = annotated
-                    , nextFreshN = n1
-                    }
-            in
-            case may of
-                Nothing ->
-                    InferError okInferResult
-
-                Just ( exprType, restrictions ) ->
-                    case mgu restrictions of
-                        Err mguErr ->
-                            MguFailed
-                                mguErr
-                                { inputStr = s
-                                , plainExpr = parsedExpr
-                                , rectExpr = rectified
-                                , context = context
-                                , annotatedExpr = annotated
-                                , nextFreshN = n1
-                                , restrictions = restrictions
-                                , exprType = exprType
-                                }
-
-                        Ok substitution ->
-                            MguOk
-                                { inputStr = s
-                                , rectExpr = rectified
-                                , plainExpr = parsedExpr
-                                , typedExpr = annotated
-                                , context = context
-                                , restrictions = restrictions
-                                , exprType = exprType
-                                , substitution = simplifySubs substitution
-                                , nextFreshN = n2
-                                }
-
-
 view : Model -> Html Msg
 view model =
     let
@@ -443,16 +348,6 @@ view model =
         , style "font-size" "16px"
         ]
         [ h2 [] [ text "Algoritmo I" ]
-        , textarea
-            [ value model.content
-            , onInput Change
-            , placeholder "(\\x.x x) (\\y.y y)"
-            , rows 2
-            , cols 60
-            , style "margin-bottom" "12px"
-            , style "font-size" "16px"
-            ]
-            []
         , div [ style "margin-bottom" "12px" ]
             [ button
                 [ onClick ToggleImplicitParens
@@ -468,217 +363,157 @@ view model =
                     (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
                 ]
             ]
-        , case model.trace of
-            ParsingError s ->
-                stepDiv "Ocurrió un error" [ text ("No se pudo reconocer el término " ++ s) ]
-
-            InferError t ->
-                div []
-                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
-                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
-                    , stepDiv "2. Anotación"
-                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.annotatedExpr) ]
-                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
-                        ]
-                    , stepDiv "3. Generación de restricciones"
-                        [ div [] [ text "Error inesperado en el algoritmo de inferencia" ]
-                        ]
-                    ]
-
-            MguFailed mguErr t ->
-                div []
-                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
-                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
-                    , stepDiv "2. Anotación"
-                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.annotatedExpr) ]
-                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
-                        ]
-                    , stepDiv "3. Generación de restricciones"
-                        [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
-                        , div [] [ text ("Restricciones: " ++ fromRestrictions t.restrictions) ]
-                        ]
-                    , stepDiv "4. Unificación"
-                        [ div [] [ text (fromMguError mguErr) ] ]
-                    ]
-
-            MguOk t ->
-                div []
-                    [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
-                    , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
-                    , stepDiv "2. Anotación"
-                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
-                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
-                        ]
-                    , stepDiv "3. Generación de restricciones"
-                        [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
-                        , div [] [ text ("Restricciones: " ++ fromRestrictions t.restrictions) ]
-                        ]
-                    , stepDiv "4. Unificación"
-                        [ div [] [ text ("Sustitución: " ++ fromSubstitution t.substitution t.nextFreshN) ] ]
-                    , stepDiv "Resultado"
-                        [ div []
-                            [ text
-                                (fromContext (Dict.map (\_ t1 -> substitute t.substitution t1) t.context)
-                                    ++ (" ⊢ " ++ fromTypedExpr model.showImplicitParens (substituteExpr t.substitution t.typedExpr))
-                                    ++ (" : " ++ fromType (substitute t.substitution t.exprType))
-                                )
-                            ]
-                        ]
-                    ]
-        , div
-            [ style "margin-top" "28px"
-            , style "display" "flex"
-            , style "flex-direction" "row"
-            , style "justify-content" "flex-end"
-            , style "gap" "6px"
-            ]
-            [ button
-                [ onClick Previous
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
-                ]
-                [ text "Atrás" ]
-            , button
-                [ onClick Next
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
-                ]
-                [ text "Siguiente" ]
-            ]
+        , viewStep model
         ]
+
+
+stepStateButton : String -> Msg -> Html Msg
+stepStateButton s m =
+    button
+        [ onClick m
+        , style "background" "#eee"
+        , style "border" "none"
+        , style "padding" "8px 16px"
+        , style "cursor" "pointer"
+        ]
+        [ text s ]
+
+
+stepFooter : List (Html Msg) -> Html Msg
+stepFooter =
+    div
+        [ style "margin-top" "28px"
+        , style "display" "flex"
+        , style "flex-direction" "row"
+        , style "justify-content" "flex-end"
+        , style "gap" "6px"
+        ]
+
+
+exprTextArea : String -> Html Msg
+exprTextArea input =
+    textarea
+        [ value input
+        , onInput Change
+        , rows 2
+        , cols 60
+        , style "margin-bottom" "12px"
+        , style "font-size" "16px"
+        ]
+        []
 
 
 viewStep : Model -> Html Msg
 viewStep model =
-    let
-        ifShowParens a b =
-            if model.showImplicitParens then
-                a
-
-            else
-                b
-    in
     div
-        [ style "width" "70%"
-        , style "margin" "40px auto"
-        , style "font-family" "sans-serif"
-        , style "font-size" "16px"
+        [ style "display" "flex"
+        , style "flex-direction" "column"
         ]
-        [ h3 [] [ text "" ]
-        , div [ style "margin-bottom" "12px" ]
-            [ button
-                [ onClick ToggleImplicitParens
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
+        (case model.state of
+            Initial input ->
+                [ h3 [] [ text "Escribí tu expresión" ]
+                , exprTextArea input
                 ]
-                [ text
-                    (ifShowParens "Esconder" "Mostrar" ++ " paréntesis implícitos")
-                ]
-            ]
-        , div []
-            (case model.step of
-                WritingTerm ->
-                    [ h3 [] [ text "Escribí tu expresión" ]
-                    , textarea
-                        [ value model.content
-                        , onInput Change
-                        , placeholder "(\\x.x x) (\\y.y y)"
-                        , rows 2
-                        , cols 60
-                        , style "margin-bottom" "12px"
-                        , style "font-size" "16px"
-                        ]
-                        []
-                    , case mode.trace of
-                        ParsingError s ->
-                            stepDiv "Ocurrió un error" [ text ("No se pudo reconocer el término " ++ s) ]
 
-                        _ ->
-                            button [] [ text "Empezar" ]
+            ParseErr input ->
+                [ h3 [] [ text "Escribí tu expresión" ]
+                , exprTextArea input
+                , span [] [ text "Error" ]
+                ]
+
+            ParseOk data ->
+                [ h3 [] [ text "Escribí tu expresión" ]
+                , exprTextArea data.input
+                , stepFooter [ stepStateButton "Empezar" Next ]
+                ]
+
+            Rectified data ->
+                [ h3 [] [ text "1. Rectificar el término" ]
+                , p [] [ text "Alguna explicación" ]
+                , div []
+                    [ text <|
+                        "El término inicial es "
+                            ++ fromExpr model.showImplicitParens data.parsedExpr
                     ]
-
-                Rectification ->
-                    [ stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
+                , div []
+                    [ text <|
+                        "El término rectificado es "
+                            ++ fromExpr model.showImplicitParens data.rectExpr
                     ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
 
-                Annotation ->
-                    [ stepDiv "2. Anotación"
-                        [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.annotatedExpr) ]
-                        , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
+            Annotated data ->
+                [ h3 [] [ text "2. Anotar el término" ]
+                , p [] [ text "Alguna explicación" ]
+                , div []
+                    [ text "Resultado "
+                    , div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
+                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
+                    ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
+
+            InferErr data ->
+                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                , p [] [ text "Error" ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Volver a empezar" Reset
+                    ]
+                ]
+
+            InferOk data ->
+                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                , p [] [ text "Alguna explicación" ]
+                , div []
+                    [ text "Resultado "
+                    , div [] [ text <| "τ = " ++ fromType data.exprType ]
+                    , div [] [ text <| "E = " ++ fromRestrictions data.restrictions ]
+                    ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
+
+            UnificationErr data ->
+                [ h3 [] [ text "4. Unificación" ]
+                , p [] [ text (fromMguError data.mguError) ]
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Siguiente" Next
+                    ]
+                ]
+
+            UnificationOk data ->
+                [ h3 [] [ text "4. Unificación" ]
+                , p [] [ text "Alguna explicación" ]
+                , div []
+                    [ div []
+                        [ text <| "S = MGU(E) = " ++ fromSubstitution data.substitution data.nextFreshN ]
+                    , div [] [ text "Resultado final" ]
+                    , div []
+                        [ text <|
+                            fromContext data.context
+                                ++ "⊢"
+                                ++ fromTypedExpr model.showImplicitParens (substituteExpr data.substitution data.annotatedExpr)
+                                ++ ": "
+                                ++ fromType data.exprType
                         ]
                     ]
-
-                MguOk t ->
-                    div []
-                        [ stepDiv "0. Término sin tipo" [ text (fromExpr model.showImplicitParens t.plainExpr) ]
-                        , stepDiv "1. Rectificación" [ text (fromExpr model.showImplicitParens t.rectExpr) ]
-                        , stepDiv "2. Anotación"
-                            [ div [] [ text ("M₀: " ++ fromTypedExpr model.showImplicitParens t.typedExpr) ]
-                            , div [] [ text ("Γ₀: " ++ fromContext t.context) ]
-                            ]
-                        , stepDiv "3. Generación de restricciones"
-                            [ div [] [ text ("Tipo: " ++ fromType t.exprType) ]
-                            , div [] [ text ("Restricciones: " ++ fromRestrictions t.restrictions) ]
-                            ]
-                        , stepDiv "4. Unificación"
-                            [ div [] [ text ("Sustitución: " ++ fromSubstitution t.substitution t.nextFreshN) ] ]
-                        , stepDiv "Resultado"
-                            [ div []
-                                [ text
-                                    (fromContext (Dict.map (\_ t1 -> substitute t.substitution t1) t.context)
-                                        ++ (" ⊢ " ++ fromTypedExpr model.showImplicitParens (substituteExpr t.substitution t.typedExpr))
-                                        ++ (" : " ++ fromType (substitute t.substitution t.exprType))
-                                    )
-                                ]
-                            ]
-                        ]
-            )
-        , div
-            [ style "margin-top" "28px"
-            , style "display" "flex"
-            , style "flex-direction" "row"
-            , style "justify-content" "flex-end"
-            , style "gap" "6px"
-            ]
-            [ button
-                [ onClick Previous
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
+                , stepFooter
+                    [ stepStateButton "Atrás" Previous
+                    , stepStateButton "Volver a empezar" Reset
+                    ]
                 ]
-                [ text "Atrás" ]
-            , button
-                [ onClick Next
-                , style "background"
-                    (ifShowParens "#007acc" "#eee")
-                , style "color"
-                    (ifShowParens "white" "black")
-                , style "border" "none"
-                , style "padding" "8px 16px"
-                , style "cursor" "pointer"
-                ]
-                [ text "Siguiente" ]
-            ]
-        ]
+        )
 
 
 substituteExpr : Substitution -> TypedExpr -> TypedExpr
