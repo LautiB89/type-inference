@@ -437,7 +437,7 @@ viewStep model =
                     , li [] [ text "El término M₀ está anotado de tal modo que Erase(M₀) = U." ]
                     ]
                 , div [ style "margin-bottom" "12px" ]
-                    [ text "Todos las tipos y las anotaciones que se agregan son incógnitas frescas."
+                    [ text "Todos los tipos y las anotaciones que se agregan son incógnitas frescas."
                     ]
                 , text "Resultado"
                 , stepDiv
@@ -461,6 +461,11 @@ viewStep model =
 
             InferOk data ->
                 [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
+                , text "Entrada"
+                , stepDiv
+                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
+                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
+                    ]
                 , text "Resultado"
                 , stepDiv
                     [ div [] [ text <| "τ = " ++ fromType data.exprType ]
@@ -481,14 +486,14 @@ viewStep model =
                     , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
                     ]
                 , div [] [ text "Resultado" ]
-                , stepDiv
+                , div []
                     [ text "El algoritmo de unificación falla con "
-                    , text (fromMguError data.mguError)
+                    , text <| fromMguError data.mguError ++ "."
                     ]
                 , div [] [ text "Por lo tanto, el término no es tipable." ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Siguiente" Next
+                    , stepStateButton "Volver a empezar" Reset
                     ]
                 ]
 
