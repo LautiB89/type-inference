@@ -1,4 +1,4 @@
-module Main exposing (Model, Msg(..), main)
+module Main exposing (Model, Msg(..), State, main)
 
 import Browser
 import Expr exposing (Expr, fromExpr)
@@ -19,7 +19,7 @@ import Type exposing (Type, fromType)
 import TypedExpr
     exposing
         ( Context
-        , TypedExpr(..)
+        , TypedExpr
         , annotate
         , fromContext
         , fromTypedExpr
@@ -289,10 +289,6 @@ viewStep model =
         ]
         (case model.state of
             Parse input ->
-                let
-                    parseResult =
-                        parse input
-                in
                 [ h3 [] [ text "Escribí tu expresión" ]
                 , exprTextArea input
                 ]
@@ -300,6 +296,10 @@ viewStep model =
                             []
 
                         else
+                            let
+                                parseResult =
+                                    parse input
+                            in
                             case parseResult of
                                 Err _ ->
                                     [ span [] [ text "No se puede reconocer a qué término se corresponde." ] ]
