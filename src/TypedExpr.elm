@@ -1,4 +1,4 @@
-module TypedExpr exposing (Context, TypedExpr(..), annotate, foldrTypedExpr, fromContext, fromTypedExpr, infer, substituteContext)
+module TypedExpr exposing (Context, TypedExpr(..), annotate, foldrTypedExpr, fromContext, fromTypedExpr, infer, substituteContext, substituteExpr)
 
 import Dict exposing (Dict)
 import Expr exposing (Expr(..), Id, foldrExpr)
@@ -42,6 +42,21 @@ fromContext c =
 substituteContext : Substitution -> Context -> Context
 substituteContext s =
     Dict.map (\_ t -> substitute s t)
+
+
+substituteExpr : Substitution -> TypedExpr -> TypedExpr
+substituteExpr s =
+    foldrTypedExpr
+        TEVar
+        (\id t -> TEAbs id (substitute s t))
+        TEApp
+        TEConstTrue
+        TEConstFalse
+        TEIsZero
+        TEConstZero
+        TESucc
+        TEPred
+        TEIf
 
 
 freeExprVars : Expr -> Set Id

@@ -14,18 +14,18 @@ import Restrictions
         , fromRestrictions
         , mgu
         )
-import Substitution exposing (Substitution, fromSubstitution, substitute)
+import Substitution exposing (fromSubstitution, substitute)
 import Type exposing (Type, fromType)
 import TypedExpr
     exposing
         ( Context
         , TypedExpr(..)
         , annotate
-        , foldrTypedExpr
         , fromContext
         , fromTypedExpr
         , infer
         , substituteContext
+        , substituteExpr
         )
 
 
@@ -442,18 +442,3 @@ viewStep model =
                             ]
                         ]
         )
-
-
-substituteExpr : Substitution -> TypedExpr -> TypedExpr
-substituteExpr s =
-    foldrTypedExpr
-        TEVar
-        (\id t -> TEAbs id (substitute s t))
-        TEApp
-        TEConstTrue
-        TEConstFalse
-        TEIsZero
-        TEConstZero
-        TESucc
-        TEPred
-        TEIf
