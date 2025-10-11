@@ -4,25 +4,23 @@ import Browser
 import Expr exposing (Expr, fromExpr)
 import ExprParser exposing (parse)
 import Html exposing (Html, button, div, h2, h3, input, label, li, ol, span, text, textarea, ul)
-import Html.Attributes exposing (cols, for, id, rows, style, type_, value)
+import Html.Attributes exposing (for, id, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import MinRectify exposing (minRectify)
 import Restrictions
     exposing
-        ( MguError
-        , Restriction
-        , Restrictions
+        ( Restrictions
         , fromMguError
         , fromRestrictions
         , mgu
         )
-import Substitution exposing (Substitution, fromSubstitution, simplifySubs, substitute)
+import Substitution exposing (Substitution, fromSubstitution, substitute)
 import Type exposing (Type, fromType)
 import TypedExpr
     exposing
         ( Context
         , TypedExpr(..)
-        , decorate
+        , annotate
         , foldrTypedExpr
         , fromContext
         , fromTypedExpr
@@ -64,7 +62,7 @@ type State
         , rectExpr : Expr
         , context : Context
         , annotatedExpr : TypedExpr
-        , nextFreshN : Int
+        , annotateLastFreshN : Int
         }
     | Unify
         { input : String
@@ -72,9 +70,10 @@ type State
         , rectExpr : Expr
         , context : Context
         , annotatedExpr : TypedExpr
+        , annotateLastFreshN : Int
         , exprType : Type
         , restrictions : Restrictions
-        , nextFreshN : Int
+        , inferLastFreshN : Int
         }
 
 
@@ -124,7 +123,7 @@ next step =
         Annotate { input, parsedExpr, rectExpr } ->
             let
                 ( context, annotatedExpr, nextFreshN ) =
-                    decorate rectExpr
+                    annotate rectExpr
             in
             Infer
                 { input = input
@@ -132,13 +131,13 @@ next step =
                 , rectExpr = rectExpr
                 , context = context
                 , annotatedExpr = annotatedExpr
-                , nextFreshN = nextFreshN
+                , annotateLastFreshN = nextFreshN
                 }
 
-        Infer { input, parsedExpr, rectExpr, context, annotatedExpr, nextFreshN } ->
+        Infer { input, parsedExpr, rectExpr, context, annotatedExpr, annotateLastFreshN } ->
             let
-                ( maybeRes, nextFreshN2 ) =
-                    infer context annotatedExpr nextFreshN
+                ( maybeRes, inferLastFreshN ) =
+                    infer context annotatedExpr annotateLastFreshN
             in
             case maybeRes of
                 Nothing ->
@@ -151,9 +150,10 @@ next step =
                         , rectExpr = rectExpr
                         , context = context
                         , annotatedExpr = annotatedExpr
+                        , annotateLastFreshN = annotateLastFreshN
                         , exprType = exprType
                         , restrictions = restrictions
-                        , nextFreshN = nextFreshN2
+                        , inferLastFreshN = inferLastFreshN
                         }
 
         Unify _ ->
@@ -169,27 +169,38 @@ previous step =
         Rectify { input } ->
             Parse input
 
-        Annotate data ->
-            Rectify data
+        Annotate { input, parsedExpr } ->
+            Rectify { input = input, parsedExpr = parsedExpr }
 
-        Infer data ->
-            Annotate data
+        Infer { input, parsedExpr, rectExpr } ->
+            Annotate
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                }
 
-        Unify data ->
-            Infer data
+        Unify { input, parsedExpr, rectExpr, context, annotatedExpr, annotateLastFreshN } ->
+            Infer
+                { input = input
+                , parsedExpr = parsedExpr
+                , rectExpr = rectExpr
+                , context = context
+                , annotatedExpr = annotatedExpr
+                , annotateLastFreshN = annotateLastFreshN
+                }
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
         Change newInput ->
-            { model | state = next (Initial newInput) }
+            { model | state = Parse newInput }
 
         ToggleImplicitParens ->
             { model | showImplicitParens = not model.showImplicitParens }
 
         Reset ->
-            { model | state = Initial "" }
+            { model | state = Parse "" }
 
         Next ->
             { model | state = next model.state }
@@ -241,8 +252,6 @@ stepStateButton : String -> Msg -> Html Msg
 stepStateButton s m =
     button
         [ onClick m
-        , style "background" "#eee"
-        , style "border" "none"
         , style "padding" "8px 16px"
         , style "cursor" "pointer"
         ]
@@ -265,8 +274,6 @@ exprTextArea input =
     textarea
         [ value input
         , onInput Change
-        , rows 2
-        , cols 60
         , style "margin-bottom" "12px"
         , style "font-size" "16px"
         ]
@@ -280,149 +287,6 @@ viewStep model =
         , style "flex-direction" "column"
         ]
         (case model.state of
-            Initial input ->
-                [ h3 [] [ text "Escribí tu expresión" ]
-                , exprTextArea input
-                ]
-
-            ParseErr input ->
-                [ h3 [] [ text "Escribí tu expresión" ]
-                , exprTextArea input
-                , span [] [ text "No se puede reconocer a qué término se corresponde." ]
-                ]
-
-            ParseOk data ->
-                [ h3 [] [ text "Escribí tu expresión" ]
-                , exprTextArea data.input
-                , text "El término es"
-                , stepDiv [ text <| fromExpr model.showImplicitParens data.parsedExpr ]
-                , stepFooter [ stepStateButton "Empezar" Next ]
-                ]
-
-            Rectified data ->
-                [ h3 [] [ text "1. Rectificar el término" ]
-                , text "Decimos que un término está rectificado si:"
-                , ul [ style "margin" "2px" ]
-                    [ li [] [ text "No hay dos variables ligadas con el mismo nombre." ]
-                    , li [] [ text "No hay una variable ligada con el mismo nombre que una variable libre." ]
-                    ]
-                , div [ style "margin-bottom" "12px" ] [ text "Siempre podemos rectificar un término a través de alpha-renombres." ]
-                , text "Término inicial"
-                , stepDiv [ text <| fromExpr model.showImplicitParens data.parsedExpr ]
-                , div [ style "margin-top" "12px" ] [ text "Término rectificado" ]
-                , stepDiv [ text <| fromExpr model.showImplicitParens data.rectExpr ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Siguiente" Next
-                    ]
-                ]
-
-            Annotated data ->
-                [ h3 [] [ text "2. Anotar el término" ]
-                , text "Producimos un contexto Γ₀ y un término M₀"
-                , ul [ style "margin" "2px" ]
-                    [ li [] [ text "El contexto Γ₀ le da tipo a todas las variables libres de U." ]
-                    , li [] [ text "El término M₀ está anotado de tal modo que Erase(M₀) = U." ]
-                    ]
-                , div [ style "margin-bottom" "12px" ]
-                    [ text "Todos los tipos y las anotaciones que se agregan son incógnitas frescas."
-                    ]
-                , text "Resultado"
-                , stepDiv
-                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
-                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
-                    ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Siguiente" Next
-                    ]
-                ]
-
-            InferErr _ ->
-                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
-                , text "Ocurrió un error inesperado al generar las restricciones."
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Volver a empezar" Reset
-                    ]
-                ]
-
-            InferOk data ->
-                [ h3 [] [ text "3. Calcular el conjunto de restricciones" ]
-                , text "Entrada"
-                , stepDiv
-                    [ div [] [ text <| "M₀ = " ++ fromTypedExpr model.showImplicitParens data.annotatedExpr ]
-                    , div [] [ text <| "Γ₀ = " ++ fromContext data.context ]
-                    ]
-                , text "Resultado"
-                , stepDiv
-                    [ div [] [ text <| "τ = " ++ fromType data.exprType ]
-                    , div [] [ text <| "E = " ++ fromRestrictions data.restrictions ]
-                    ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Siguiente" Next
-                    ]
-                ]
-
-            UnificationErr data ->
-                [ h3 [] [ text "4. Unificación" ]
-                , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
-                , ol [ style "margin" "2px" ]
-                    [ li [] [ text "Calculamos S = mgu(E)." ]
-                    , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
-                    , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
-                    ]
-                , div [] [ text "Resultado" ]
-                , div []
-                    [ text "El algoritmo de unificación falla con "
-                    , text <| fromMguError data.mguError ++ "."
-                    ]
-                , div [] [ text "Por lo tanto, el término no es tipable." ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Volver a empezar" Reset
-                    ]
-                ]
-
-            UnificationOk data ->
-                [ h3 [] [ text "4. Unificación" ]
-                , text "Dados Γ y M, resultantes de anotar un término rectificado U, una vez calculado I(Γ | M) = (τ | E):"
-                , ol [ style "margin" "2px" ]
-                    [ li [] [ text "Calculamos S = mgu(E)." ]
-                    , li [] [ text "Si no existe el unificador, el término U no es tipable." ]
-                    , li [] [ text "Si existe el unificador, el término U es tipable y devolvemos: S(Γ) ⊢ S(M) : S(τ)" ]
-                    ]
-                , div [] [ text "Resultado" ]
-                , stepDiv
-                    [ text <| "S = MGU(E) = " ++ fromSubstitution data.substitution data.nextFreshN
-                    ]
-                , div
-                    [ style "margin-top" "16px", style "margin-bottom" "8px" ]
-                    [ text "Por lo tanto, el término es tipable y su juicio más general es" ]
-                , stepDiv
-                    [ text <|
-                        fromContext data.context
-                            ++ " ⊢ "
-                            ++ fromTypedExpr model.showImplicitParens (substituteExpr data.substitution data.annotatedExpr)
-                            ++ " : "
-                            ++ fromType data.exprType
-                    ]
-                , stepFooter
-                    [ stepStateButton "Atrás" Previous
-                    , stepStateButton "Volver a empezar" Reset
-                    ]
-                ]
-        )
-
-
-viewStep2 : Model -> State2 -> Html Msg
-viewStep2 model state =
-    div
-        [ style "display" "flex"
-        , style "flex-direction" "column"
-        ]
-        (case state of
             Parse input ->
                 let
                     parseResult =
@@ -453,7 +317,7 @@ viewStep2 model state =
                     [ li [] [ text "No hay dos variables ligadas con el mismo nombre." ]
                     , li [] [ text "No hay una variable ligada con el mismo nombre que una variable libre." ]
                     ]
-                , div [ style "margin-bottom" "12px" ] [ text "Siempre podemos rectificar un término a través de alpha-renombres." ]
+                , div [ style "margin-bottom" "12px" ] [ text "Siempre podemos rectificar un término a través de α-renombres." ]
                 , text "Término inicial"
                 , stepDiv [ text <| fromExpr model.showImplicitParens parsedExpr ]
                 , div [ style "margin-top" "12px" ] [ text "Término rectificado" ]
@@ -467,7 +331,7 @@ viewStep2 model state =
             Annotate { rectExpr } ->
                 let
                     ( context, annotatedExpr, _ ) =
-                        decorate rectExpr
+                        annotate rectExpr
                 in
                 [ h3 [] [ text "2. Anotar el término" ]
                 , text "Producimos un contexto Γ₀ y un término M₀"
@@ -489,10 +353,10 @@ viewStep2 model state =
                     ]
                 ]
 
-            Infer { context, annotatedExpr, nextFreshN } ->
+            Infer { context, annotatedExpr, annotateLastFreshN } ->
                 let
                     maybeRes =
-                        Tuple.first <| infer context annotatedExpr nextFreshN
+                        Tuple.first <| infer context annotatedExpr annotateLastFreshN
                 in
                 case maybeRes of
                     Nothing ->
@@ -522,7 +386,7 @@ viewStep2 model state =
                             ]
                         ]
 
-            Unify { annotatedExpr, exprType, restrictions, nextFreshN, context } ->
+            Unify { annotatedExpr, exprType, restrictions, inferLastFreshN, context } ->
                 let
                     mguRes =
                         mgu restrictions
@@ -558,7 +422,7 @@ viewStep2 model state =
                             ]
                         , div [] [ text "Resultado" ]
                         , stepDiv
-                            [ text <| "S = MGU(E) = " ++ fromSubstitution substitution nextFreshN
+                            [ text <| "S = MGU(E) = " ++ fromSubstitution substitution inferLastFreshN
                             ]
                         , div
                             [ style "margin-top" "16px", style "margin-bottom" "8px" ]

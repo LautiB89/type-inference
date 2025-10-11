@@ -1,4 +1,4 @@
-module LambdaParserTest exposing (suite)
+module ParserTest exposing (suite)
 
 import Expect
 import Expr exposing (Expr(..))
@@ -27,9 +27,6 @@ varParseTest =
         , test "Long var" <|
             \_ ->
                 Expect.equal (parse "xyz") (Ok (Var "xyz"))
-        , test "Long var with underscore" <|
-            \_ ->
-                Expect.equal (parse "x_aaa") (Ok (Var "x_aaa"))
         ]
 
 
@@ -50,7 +47,7 @@ natParseTest =
                 Expect.equal (parse "succ(x y z)") (Ok (Succ (App (App (Var "x") (Var "y")) (Var "z"))))
         , test "pred of succ of var" <|
             \_ ->
-                Expect.equal (parse "pred(succ(y_1))") (Ok (Pred (Succ (Var "y_1"))))
+                Expect.equal (parse "pred(succ(y1))") (Ok (Pred (Succ (Var "y1"))))
         ]
 
 

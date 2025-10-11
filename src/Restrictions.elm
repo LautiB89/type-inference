@@ -12,7 +12,7 @@ module Restrictions exposing
     )
 
 import List
-import Substitution exposing (Substitution(..), insert)
+import Substitution exposing (Substitution(..), insert, substitute)
 import Type exposing (Type(..), fromType, hasVar, replaceVar)
 
 
@@ -78,65 +78,46 @@ mgu ys =
         [] ->
             Ok Substitution.empty
 
-        ( s1, s2 ) :: xs ->
-            let
-                swap =
-                    insert ( s2, s1 ) xs
-            in
-            case s1 of
-                TAbs d1 d2 ->
-                    case s2 of
-                        TAbs t1 t2 ->
-                            mgu (insert ( d1, t1 ) (insert ( d2, t2 ) xs))
+        ( type1, type2 ) :: xs ->
+            case ( type1, type2 ) of
+                ( TNat, TNat ) ->
+                    mgu xs
 
-                        TVar _ ->
-                            mgu swap
+                ( TBool, TBool ) ->
+                    mgu xs
 
-                        _ ->
-                            Err (Clash s1 s2)
+                ( TAbs a1 a2, TAbs b1 b2 ) ->
+                    mgu (insert ( a1, b1 ) (insert ( a2, b2 ) xs))
 
-                TBool ->
-                    case s2 of
-                        TBool ->
-                            mgu xs
+                ( TVar n, TVar m ) ->
+                    if n == m then
+                        mgu xs
 
-                        TVar _ ->
-                            mgu swap
+                    else
+                        let
+                            replaceVarN =
+                                replaceVar n type2
+                        in
+                        Result.map (\s -> Substitution.insert n (substitute s type2) s) <|
+                            mgu (List.map (Tuple.mapBoth replaceVarN replaceVarN) xs)
 
-                        _ ->
-                            Err (Clash s1 s2)
+                ( _, TVar _ ) ->
+                    mgu <| insert ( type2, type1 ) xs
 
-                TNat ->
-                    case s2 of
-                        TNat ->
-                            mgu xs
+                ( TVar n, _ ) ->
+                    if hasVar n type2 then
+                        Err (OccursCheck type1 type2)
 
-                        TVar _ ->
-                            mgu swap
+                    else
+                        let
+                            replaceVarN =
+                                replaceVar n type2
+                        in
+                        Result.map (\s -> Substitution.insert n (substitute s type2) s) <|
+                            mgu (List.map (Tuple.mapBoth replaceVarN replaceVarN) xs)
 
-                        _ ->
-                            Err (Clash s1 s2)
-
-                TVar n ->
-                    let
-                        replace =
-                            Result.map (Substitution.insert n s2) <|
-                                mgu (List.map (Tuple.mapBoth (replaceVar n s2) (replaceVar n s2)) xs)
-                    in
-                    case s2 of
-                        TVar m ->
-                            if n == m then
-                                mgu xs
-
-                            else
-                                replace
-
-                        _ ->
-                            if hasVar n s2 then
-                                Err (OccursCheck s1 s2)
-
-                            else
-                                replace
+                _ ->
+                    Err (Clash type1 type2)
 
 
 fromRestriction : Restriction -> String

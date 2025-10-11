@@ -1,9 +1,8 @@
 module UnificationTest exposing (suite)
 
 import Expect exposing (Expectation)
-import List exposing (foldr)
 import Restrictions exposing (MguError(..), Restrictions, mgu)
-import Substitution exposing (Substitution, apply, simplifySubs)
+import Substitution exposing (apply)
 import Test exposing (Test, describe, test)
 import Type exposing (Type(..))
 
@@ -26,10 +25,10 @@ swapTest =
     describe "Swap test"
         [ test "Non var expr and Var" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TAbs (TVar 1) TNat, TVar 2 ) ]
                     [ 1, 2 ]
-                    (Ok [ ( 1, TVar 1 ), ( 2, TAbs (TVar 1) TNat ) ])
+                    [ ( 1, TVar 1 ), ( 2, TAbs (TVar 1) TNat ) ]
         ]
 
 
@@ -38,32 +37,50 @@ examplesTest =
     describe "Examples test"
         [ test "Example 1" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TAbs (TVar 1) (TAbs (TVar 2) (TVar 1))
                       , TAbs (TVar 2) (TAbs (TAbs (TVar 1) TNat) (TVar 1))
                       )
                     ]
-                    []
-                    (Err (OccursCheck (TVar 2) (TAbs (TVar 2) TNat)))
+                    (OccursCheck (TVar 2) (TAbs (TVar 2) TNat))
         , test "Example 2" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TAbs (TAbs TNat (TVar 1)) (TAbs (TVar 1) (TVar 3))
                       , TAbs (TVar 2) (TAbs (TAbs (TVar 4) (TVar 4)) (TVar 2))
                       )
                     ]
                     [ 1, 2, 3, 4 ]
-                    (Ok
-                        [ ( 1, TAbs (TVar 4) (TVar 4) )
-                        , ( 2, TAbs TNat (TVar 1) )
-                        , ( 3, TAbs TNat (TAbs (TVar 4) (TVar 4)) )
-                        , ( 4, TVar 4 )
-                        ]
-                    )
-        , test "Simplify complex substitution" <|
+                    [ ( 1, TAbs (TVar 4) (TVar 4) )
+                    , ( 2, TAbs TNat (TAbs (TVar 4) (TVar 4)) )
+                    , ( 3, TAbs TNat (TAbs (TVar 4) (TVar 4)) )
+                    , ( 4, TVar 4 )
+                    ]
+        , test "Substitution composition" <|
             \_ ->
-                Expect.equalLists
-                    (List.map (\n -> ( n, apply exampleSust n )) [ 1, 2, 3, 4, 5 ])
+                expectMguOk
+                    [ ( TVar 1, TVar 2 )
+                    , ( TVar 2, TVar 3 )
+                    , ( TVar 3, TVar 4 )
+                    , ( TVar 4, TVar 5 )
+                    ]
+                    [ 1, 2, 3, 4, 5 ]
+                    [ ( 1, TVar 5 )
+                    , ( 2, TVar 5 )
+                    , ( 3, TVar 5 )
+                    , ( 4, TVar 5 )
+                    , ( 5, TVar 5 )
+                    ]
+        , test "Substitution composition over nested type" <|
+            \_ ->
+                expectMguOk
+                    [ ( TVar 1, TVar 2 )
+                    , ( TVar 2, TAbs TBool TBool )
+                    , ( TNat, TVar 4 )
+                    , ( TVar 3, TAbs (TVar 4) (TVar 2) )
+                    , ( TVar 3, TVar 5 )
+                    ]
+                    [ 1, 2, 3, 4, 5 ]
                     [ ( 1, TAbs TBool TBool )
                     , ( 2, TAbs TBool TBool )
                     , ( 3, TAbs TNat (TAbs TBool TBool) )
@@ -73,47 +90,29 @@ examplesTest =
         ]
 
 
-exampleSust : Substitution
-exampleSust =
-    simplifySubs <|
-        foldr
-            (\( n, t ) rec -> Substitution.insert n t rec)
-            Substitution.empty
-            [ ( 1, TVar 2 )
-            , ( 2, TAbs TBool TBool )
-            , ( 4, TNat )
-            , ( 3, TAbs (TVar 4) (TVar 2) )
-            , ( 5, TVar 3 )
-            ]
-
-
 clashTest : Test
 clashTest =
     describe "Clash test"
         [ test "Nat with Bool" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TNat, TBool ) ]
-                    []
-                    (Err (Clash TNat TBool))
+                    (Clash TNat TBool)
         , test "Bool with Nat" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TBool, TNat ) ]
-                    []
-                    (Err (Clash TBool TNat))
+                    (Clash TBool TNat)
         , test "Abs with Bool" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TAbs TBool TBool, TBool ) ]
-                    []
-                    (Err (Clash (TAbs TBool TBool) TBool))
+                    (Clash (TAbs TBool TBool) TBool)
         , test "Abs with Nat" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TAbs TBool TBool, TNat ) ]
-                    []
-                    (Err (Clash (TAbs TBool TBool) TNat))
+                    (Clash (TAbs TBool TBool) TNat)
         ]
 
 
@@ -122,34 +121,29 @@ occursCheckTest =
     describe "Occurs check test"
         [ test "1 level occurs check left" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TVar 1, TAbs (TVar 1) TBool ) ]
-                    []
-                    (Err (OccursCheck (TVar 1) (TAbs (TVar 1) TBool)))
+                    (OccursCheck (TVar 1) (TAbs (TVar 1) TBool))
         , test "1 level occurs check right" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TVar 1, TAbs TBool (TVar 1) ) ]
-                    []
-                    (Err (OccursCheck (TVar 1) (TAbs TBool (TVar 1))))
+                    (OccursCheck (TVar 1) (TAbs TBool (TVar 1)))
         , test "1 level occurs check right and left" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TVar 1, TAbs (TVar 1) (TVar 1) ) ]
-                    []
-                    (Err (OccursCheck (TVar 1) (TAbs (TVar 1) (TVar 1))))
+                    (OccursCheck (TVar 1) (TAbs (TVar 1) (TVar 1)))
         , test "2 levels occurs check left" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TVar 1, TAbs (TAbs TNat (TVar 1)) TBool ) ]
-                    []
-                    (Err (OccursCheck (TVar 1) (TAbs (TAbs TNat (TVar 1)) TBool)))
+                    (OccursCheck (TVar 1) (TAbs (TAbs TNat (TVar 1)) TBool))
         , test "2 levels occurs check right" <|
             \_ ->
-                expectMgu
+                expectMguErr
                     [ ( TVar 1, TAbs TBool (TAbs (TVar 1) TNat) ) ]
-                    []
-                    (Err (OccursCheck (TVar 1) (TAbs TBool (TAbs (TVar 1) TNat))))
+                    (OccursCheck (TVar 1) (TAbs TBool (TAbs (TVar 1) TNat)))
         ]
 
 
@@ -158,22 +152,23 @@ deleteTest =
     describe "Delete test"
         [ test "Var" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TVar 1, TVar 1 ) ]
                     [ 1 ]
-                    (Ok [ ( 1, TVar 1 ) ])
+                    [ ( 1, TVar 1 ) ]
         ]
 
 
-expectMgu : Restrictions -> List Int -> Result MguError (List ( Int, Type )) -> Expectation
-expectMgu restrictions varDom expectedRes =
-    let
-        resSust =
-            mgu restrictions
-    in
+expectMguOk : Restrictions -> List Int -> List ( Int, Type ) -> Expectation
+expectMguOk restrictions varDom expectedRes =
     Expect.equal
-        (Result.map (\sust -> List.map (\n -> ( n, apply sust n )) varDom) resSust)
-        expectedRes
+        (Result.map (\sust -> List.map (\n -> ( n, apply sust n )) varDom) (mgu restrictions))
+        (Ok expectedRes)
+
+
+expectMguErr : Restrictions -> MguError -> Expectation
+expectMguErr restrictions expectedError =
+    Expect.equal (mgu restrictions) (Err expectedError)
 
 
 decomposeTest : Test
@@ -181,22 +176,22 @@ decomposeTest =
     describe "Decompose rule test"
         [ test "Abs" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TAbs (TVar 1) TNat, TAbs TBool (TVar 2) ) ]
                     [ 1, 2 ]
-                    (Ok [ ( 1, TBool ), ( 2, TNat ) ])
+                    [ ( 1, TBool ), ( 2, TNat ) ]
         , test "Nat" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TNat, TNat ) ]
                     []
-                    (Ok [])
+                    []
         , test "Bool" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TBool, TBool ) ]
                     []
-                    (Ok [])
+                    []
         ]
 
 
@@ -205,8 +200,8 @@ eliminateTest =
     describe "Eliminate (replace var) test"
         [ test "Identity function: (\\x.x)" <|
             \_ ->
-                expectMgu
+                expectMguOk
                     [ ( TVar 1, TAbs TBool (TVar 2) ) ]
                     [ 1, 2 ]
-                    (Ok [ ( 1, TAbs TBool (TVar 2) ), ( 2, TVar 2 ) ])
+                    [ ( 1, TAbs TBool (TVar 2) ), ( 2, TVar 2 ) ]
         ]

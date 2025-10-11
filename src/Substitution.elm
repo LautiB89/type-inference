@@ -4,7 +4,6 @@ module Substitution exposing
     , empty
     , fromSubstitution
     , insert
-    , simplifySubs
     , substitute
     )
 
@@ -26,40 +25,6 @@ empty =
         (\n ->
             TVar n
         )
-
-
-simplify : (Int -> Type) -> Type -> Type
-simplify s t =
-    case t of
-        TNat ->
-            TNat
-
-        TBool ->
-            TBool
-
-        TVar m ->
-            let
-                t2 =
-                    s m
-            in
-            case t2 of
-                TVar n ->
-                    if n == m then
-                        t
-
-                    else
-                        simplify s (s m)
-
-                _ ->
-                    simplify s t2
-
-        TAbs t1 t2 ->
-            TAbs (simplify s t1) (simplify s t2)
-
-
-simplifySubs : Substitution -> Substitution
-simplifySubs (Substitution s) =
-    Substitution (\n -> simplify s (s n))
 
 
 substitute : Substitution -> Type -> Type

@@ -1,4 +1,4 @@
-module TypedExpr exposing (Context, TypedExpr(..), decorate, foldrTypedExpr, fromContext, fromTypedExpr, infer)
+module TypedExpr exposing (Context, TypedExpr(..), annotate, foldrTypedExpr, fromContext, fromTypedExpr, infer)
 
 import Dict exposing (Dict)
 import Expr exposing (Expr(..), Id, foldrExpr)
@@ -59,20 +59,20 @@ exprContext expr =
         |> Set.foldl (\x ( n, d ) -> ( n + 1, Dict.insert x (TVar n) d )) ( 1, Dict.empty )
 
 
-decorate : Expr -> ( Context, TypedExpr, Int )
-decorate expr =
+annotate : Expr -> ( Context, TypedExpr, Int )
+annotate expr =
     let
         ( n, context ) =
             exprContext expr
 
         ( typedExpr, n1 ) =
-            decorateHelper expr n
+            annotateHelper expr n
     in
     ( context, typedExpr, n1 )
 
 
-decorateHelper : Expr -> Int -> ( TypedExpr, Int )
-decorateHelper expr n =
+annotateHelper : Expr -> Int -> ( TypedExpr, Int )
+annotateHelper expr n =
     case expr of
         Var id ->
             ( TEVar id, n )
@@ -83,17 +83,17 @@ decorateHelper expr n =
                     n + 1
 
                 ( rec, n2 ) =
-                    decorateHelper e n1
+                    annotateHelper e n1
             in
             ( TEAbs id (TVar n) rec, n2 )
 
         App e1 e2 ->
             let
                 ( rec1, n1 ) =
-                    decorateHelper e1 n
+                    annotateHelper e1 n
 
                 ( rec2, n2 ) =
-                    decorateHelper e2 n1
+                    annotateHelper e2 n1
             in
             ( TEApp rec1 rec2, n2 )
 
@@ -106,7 +106,7 @@ decorateHelper expr n =
         IsZero e ->
             let
                 ( rec, n1 ) =
-                    decorateHelper e n
+                    annotateHelper e n
             in
             ( TEIsZero rec, n1 )
 
@@ -116,27 +116,27 @@ decorateHelper expr n =
         Succ e ->
             let
                 ( rec, n1 ) =
-                    decorateHelper e n
+                    annotateHelper e n
             in
             ( TESucc rec, n1 )
 
         Pred e ->
             let
                 ( rec, n1 ) =
-                    decorateHelper e n
+                    annotateHelper e n
             in
             ( TEPred rec, n1 )
 
         If e1 e2 e3 ->
             let
                 ( rec1, n1 ) =
-                    decorateHelper e1 n
+                    annotateHelper e1 n
 
                 ( rec2, n2 ) =
-                    decorateHelper e2 n1
+                    annotateHelper e2 n1
 
                 ( rec3, n3 ) =
-                    decorateHelper e3 n2
+                    annotateHelper e3 n2
             in
             ( TEIf rec1 rec2 rec3, n3 )
 
