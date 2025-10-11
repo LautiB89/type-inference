@@ -6,7 +6,7 @@ import ExprParser exposing (parse)
 import Html exposing (Html, button, div, h2, h3, input, label, li, ol, span, text, textarea, ul)
 import Html.Attributes exposing (for, id, style, type_, value)
 import Html.Events exposing (onClick, onInput)
-import MinRectify exposing (minRectify)
+import Rectify exposing (rectify)
 import Restrictions
     exposing
         ( Restrictions
@@ -117,7 +117,7 @@ next step =
             Annotate
                 { input = input
                 , parsedExpr = parsedExpr
-                , rectExpr = minRectify parsedExpr
+                , rectExpr = rectify parsedExpr
                 }
 
         Annotate { input, parsedExpr, rectExpr } ->
@@ -321,7 +321,7 @@ viewStep model =
                 , text "Término inicial"
                 , stepDiv [ text <| fromExpr model.showImplicitParens parsedExpr ]
                 , div [ style "margin-top" "12px" ] [ text "Término rectificado" ]
-                , stepDiv [ text <| fromExpr model.showImplicitParens (minRectify parsedExpr) ]
+                , stepDiv [ text <| fromExpr model.showImplicitParens (rectify parsedExpr) ]
                 , stepFooter
                     [ stepStateButton "Atrás" Previous
                     , stepStateButton "Siguiente" Next

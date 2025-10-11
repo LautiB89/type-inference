@@ -2,7 +2,7 @@ module RectifyTest exposing (suite)
 
 import Expect
 import Expr exposing (Expr(..))
-import MinRectify exposing (minRectify)
+import Rectify exposing (rectify)
 import Test exposing (Test, describe, test)
 
 
@@ -19,7 +19,7 @@ suite =
 minRectifyKeepsSameTerm : Expr -> () -> Expect.Expectation
 minRectifyKeepsSameTerm t =
     \_ ->
-        Expect.equal (minRectify t) t
+        Expect.equal (rectify t) t
 
 
 varRectifyTest : Test
@@ -59,21 +59,21 @@ absRectifyTest =
         , test "Identity function with same free var" <|
             \_ ->
                 Expect.equal
-                    (minRectify (App (Abs "x" (Var "x")) (Var "x")))
+                    (rectify (App (Abs "x" (Var "x")) (Var "x")))
                     (App (Abs "x1" (Var "x1")) (Var "x"))
         , test "Multiple abstractions with same bound var" <|
             \_ ->
                 Expect.equal
-                    (minRectify (App (Abs "x" (Var "x")) (Abs "x" (Var "x"))))
+                    (rectify (App (Abs "x" (Var "x")) (Abs "x" (Var "x"))))
                     (App (Abs "x1" (Var "x1")) (Abs "x" (Var "x")))
         , test "Nested abstractions with same bound var" <|
             \_ ->
                 Expect.equal
-                    (minRectify (Abs "x" (Abs "x" (Var "x"))))
+                    (rectify (Abs "x" (Abs "x" (Var "x"))))
                     (Abs "x1" (Abs "x" (Var "x")))
         , test "Nested abstractions with same bound var and free var" <|
             \_ ->
                 Expect.equal
-                    (minRectify (App (Var "x") (Abs "x" (Abs "x" (Var "x")))))
+                    (rectify (App (Var "x") (Abs "x" (Abs "x" (Var "x")))))
                     (App (Var "x") (Abs "x1" (Abs "x2" (Var "x2"))))
         ]
