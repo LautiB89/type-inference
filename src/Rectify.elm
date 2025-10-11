@@ -1,4 +1,4 @@
-module MinRectify exposing (minRectify)
+module Rectify exposing (rectify)
 
 import Expr exposing (Expr(..), Id, foldrExpr, recrExpr)
 import Multiset exposing (Multiset)
@@ -139,8 +139,8 @@ rectifyHelper e freeVars boundVars =
             ( If ne1 ne2 ne3, bv3 )
 
 
-minRectify : Expr -> Expr
-minRectify e =
+rectify : Expr -> Expr
+rectify e =
     let
         ( fv, bv ) =
             freeAndBoundVars e
