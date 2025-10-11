@@ -1,9 +1,10 @@
-module TypedExpr exposing (Context, TypedExpr(..), annotate, foldrTypedExpr, fromContext, fromTypedExpr, infer)
+module TypedExpr exposing (Context, TypedExpr(..), annotate, foldrTypedExpr, fromContext, fromTypedExpr, infer, substituteContext)
 
 import Dict exposing (Dict)
 import Expr exposing (Expr(..), Id, foldrExpr)
 import Restrictions exposing (Restrictions)
 import Set exposing (Set)
+import Substitution exposing (Substitution, substitute)
 import Type exposing (Type(..), fromType)
 import UnicodeSmallDigit exposing (shrinkDigits)
 import Utils exposing (lift, lift2, lift3, maybeParens)
@@ -36,6 +37,11 @@ fromContext c =
                 |> List.foldr (\x y -> x ++ y) ""
     in
     "{" ++ res ++ "}"
+
+
+substituteContext : Substitution -> Context -> Context
+substituteContext s =
+    Dict.map (\_ t -> substitute s t)
 
 
 freeExprVars : Expr -> Set Id

@@ -25,6 +25,7 @@ import TypedExpr
         , fromContext
         , fromTypedExpr
         , infer
+        , substituteContext
         )
 
 
@@ -429,11 +430,11 @@ viewStep model =
                             [ text "Por lo tanto, el término es tipable y su juicio más general es" ]
                         , stepDiv
                             [ text <|
-                                fromContext context
+                                fromContext (substituteContext substitution context)
                                     ++ " ⊢ "
                                     ++ fromTypedExpr model.showImplicitParens (substituteExpr substitution annotatedExpr)
                                     ++ " : "
-                                    ++ fromType exprType
+                                    ++ fromType (substitute substitution exprType)
                             ]
                         , stepFooter
                             [ stepStateButton "Atrás" Previous
